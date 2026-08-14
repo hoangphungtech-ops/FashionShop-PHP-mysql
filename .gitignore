@@ -1,4 +1,5 @@
-.Fashion_Shop
+.env
 .vscode/
 .idea/
-.env
+.DS_Store
+Thumbs.db
