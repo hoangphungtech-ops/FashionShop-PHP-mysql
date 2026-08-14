@@ -1,5 +1,14 @@
-.env
+# Database config cá nhân
+config/database.php
+
+# IDE
 .vscode/
 .idea/
+
+# OS
 .DS_Store
 Thumbs.db
+
+# File upload thực tế
+uploads/products/*
+!uploads/products/.gitkeep
