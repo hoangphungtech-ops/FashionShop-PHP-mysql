@@ -18,3 +18,11 @@ Bài tập nhóm cuối kỳ môn Lập trình Web.
 4. Hoà Trọng
 5. Nhật Hoàng
 6. Khang Dũng
+
+##  CÔng việc
+Hệ thống – Phùng
+Giao diện – Nghi
+Quản trị – Thùy
+Tài khoản – Hoàng
+Tính năng – Dũng
+Giỏ hàng – Trọng
