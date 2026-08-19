@@ -3,16 +3,12 @@
 $host = 'localhost';
 $dbname = 'fashion_shop';
 $username = 'root';
-$password = '';
+$password = 'your_mysql_password';
 
-try {
-    $pdo = new PDO(
-        "mysql:host=$host;dbname=$dbname;charset=utf8mb4",
-        $username,
-        $password
-    );
+$conn = new mysqli($host, $username, $password, $dbname);
 
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die('Lỗi kết nối Database: ' . $e->getMessage());
+if ($conn->connect_error) {
+    die('Kết nối database thất bại: ' . $conn->connect_error);
 }
+
+$conn->set_charset('utf8mb4');
