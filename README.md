@@ -1,8 +1,8 @@
 # Website bán hàng thời trang
 
-Bài tập nhóm cuối kỳ môn Lập trình Web.
+Bài tập nhóm cuối kỳ môn **Lập trình Web**.
 
-## Công nghệ
+## Công nghệ sử dụng
 
 - PHP
 - MySQL
@@ -19,10 +19,24 @@ Bài tập nhóm cuối kỳ môn Lập trình Web.
 5. Nhật Hoàng
 6. Khang Dũng
 
-##  CÔng việc
-Hệ thống – Phùng
-Giao diện – Nghi
-Quản trị – Thùy
-Tài khoản – Hoàng
-Tính năng – Dũng
-Giỏ hàng – Trọng
+## Phân công công việc
+
+- **Hoàng Phùng** – Hệ thống / Tổng hợp source / Database
+- **Uyễn Nghi** – Giao diện người dùng
+- **Ngân Thuỳ** – Trang quản trị / CRUD
+- **Hoà Trọng** – Giỏ hàng / Đặt hàng
+- **Nhật Hoàng** – Tài khoản / Phân quyền
+- **Khang Dũng** – Tính năng nâng cao / Testing
+
+## Yêu cầu môi trường
+
+- PHP 8.x
+- MySQL 8.x
+- Extension PHP `mysqli`
+
+## Cài đặt và chạy project
+
+### 1. Clone project
+
+```bash
+git clone https://github.com/hoangphungtech-ops/FashionShop-PHP-mysql.git
