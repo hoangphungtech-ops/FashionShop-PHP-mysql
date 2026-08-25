@@ -1,43 +1,62 @@
 <?php
-session_start();
 
-require_once '../config/database.php';
+require_once __DIR__ . "/../includes/db.php";
 
-/*
-|--------------------------------------------------------------------------
-| LẤY DANH SÁCH ĐƠN HÀNG
-|--------------------------------------------------------------------------
-*/
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-$stmt = $pdo->query("
-    SELECT
-        id,
-        customer_name,
-        phone,
-        address,
-        note,
-        total_amount,
-        status,
-        created_at
-    FROM orders
-    ORDER BY id DESC
-");
+/* =========================
+   KIỂM TRA ĐĂNG NHẬP
+========================= */
 
-$orders = $stmt->fetchAll();
+$userId = $_SESSION['user_id'] ?? null;
 
-/*
-|--------------------------------------------------------------------------
-| LẤY THÔNG BÁO ĐẶT HÀNG THÀNH CÔNG
-|--------------------------------------------------------------------------
-*/
+if (!$userId) {
+    header("Location: ../auth/login.php");
+    exit;
+}
 
-$success = isset($_GET['success']) && $_GET['success'] == '1';
-$orderId = isset($_GET['order_id'])
-    ? (int) $_GET['order_id']
-    : 0;
+
+/* =========================
+   LẤY LỊCH SỬ ĐƠN HÀNG
+========================= */
+
+$orders = [];
+
+try {
+
+    $sql = "SELECT
+                id,
+                receiver_name,
+                phone,
+                address,
+                total_amount,
+                status,
+                created_at
+            FROM orders
+            WHERE user_id = :user_id
+            ORDER BY id DESC";
+
+    $stmt = $pdo->prepare($sql);
+
+    $stmt->execute([
+        ':user_id' => $userId
+    ]);
+
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+
+    die("Lỗi database: " . $e->getMessage());
+
+}
+
 ?>
 
+
 <!DOCTYPE html>
+
 <html lang="vi">
 
 <head>
@@ -49,126 +68,143 @@ $orderId = isset($_GET['order_id'])
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Lịch sử mua hàng - Fashion Shop</title>
+    <title>
+        Lịch sử đơn hàng - Fashion Shop
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="../assets/css/style.css"
+    >
 
     <style>
 
-        * {
-            box-sizing: border-box;
+        .history-page {
+            padding: 70px 0 90px;
+            background: #f8fbf7;
+            min-height: 650px;
         }
 
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-        }
-
-        .container {
-            width: 92%;
-            max-width: 1200px;
-            margin: 40px auto;
-        }
-
-        h1 {
+        .history-title {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 45px;
         }
 
-        .success {
-            background: #d1e7dd;
-            color: #0f5132;
+        .history-title .small-title {
+            margin-bottom: 10px;
+        }
+
+        .history-title h1 {
+            font-size: 42px;
+            color: #263126;
+            margin-bottom: 12px;
+        }
+
+        .history-title p {
+            color: #697369;
+            font-size: 15px;
+        }
+
+        .history-box {
+            background: #ffffff;
+            border: 1px solid #e3e9e3;
+            padding: 30px;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th {
             padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 25px;
-            text-align: center;
+            background: #263126;
+            color: #ffffff;
+            text-align: left;
+            font-size: 13px;
         }
 
-        .order-box {
-            background: white;
-            margin-bottom: 25px;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-        }
-
-        .order-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 15px;
+        .history-table td {
+            padding: 18px 15px;
+            border-bottom: 1px solid #e6ebe6;
+            color: #394239;
+            vertical-align: middle;
         }
 
         .order-id {
-            font-size: 19px;
-            font-weight: bold;
+            font-weight: 700;
+            color: #263126;
         }
 
-        .status {
-            padding: 6px 12px;
-            border-radius: 20px;
-            background: #fff3cd;
-            color: #664d03;
+        .order-price {
+            font-weight: 700;
+            color: #78917d;
         }
 
-        .order-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px 30px;
-            margin-top: 20px;
+        .order-status {
+            display: inline-block;
+            padding: 7px 12px;
+            background: #edf4ee;
+            color: #526b58;
+            font-size: 12px;
+            font-weight: 700;
         }
 
-        .info-item {
-            padding: 5px 0;
-        }
-
-        .label {
-            font-weight: bold;
-        }
-
-        .order-total {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
-            text-align: right;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .empty {
-            background: white;
-            padding: 50px;
+        .empty-history {
             text-align: center;
-            border-radius: 10px;
+            padding: 70px 20px;
         }
 
-        .button {
+        .empty-history h2 {
+            color: #263126;
+            margin-bottom: 12px;
+        }
+
+        .empty-history p {
+            color: #707970;
+            margin-bottom: 25px;
+        }
+
+        .history-btn {
+            display: inline-flex;
+            padding: 13px 25px;
+            background: #263126;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .history-btn:hover {
+            background: #78917d;
+        }
+
+        .back-cart {
             display: inline-block;
             margin-top: 25px;
-            padding: 11px 18px;
-            border-radius: 6px;
-            background: #333;
-            color: white;
-            text-decoration: none;
+            color: #78917d;
+            font-weight: 600;
         }
 
-        .detail-button {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 9px 15px;
-            border-radius: 5px;
-            background: #198754;
-            color: white;
-            text-decoration: none;
+        @media (max-width: 800px) {
+
+            .history-box {
+                padding: 15px;
+                overflow-x: auto;
+            }
+
+            .history-table {
+                min-width: 850px;
+            }
+
         }
 
-        @media (max-width: 700px) {
+        @media (max-width: 600px) {
 
-            .order-info {
-                grid-template-columns: 1fr;
+            .history-page {
+                padding: 45px 0 60px;
+            }
+
+            .history-title h1 {
+                font-size: 34px;
             }
 
         }
@@ -177,179 +213,267 @@ $orderId = isset($_GET['order_id'])
 
 </head>
 
+
 <body>
 
-<div class="container">
 
-    <h1>Lịch sử mua hàng</h1>
+<!-- HEADER -->
 
+<header class="header">
 
-    <?php if ($success): ?>
+    <div class="container header-content">
 
-        <div class="success">
-
-            Đặt hàng thành công!
-
-            <?php if ($orderId > 0): ?>
-
-                Mã đơn hàng:
-                <strong>#<?= $orderId ?></strong>
-
-            <?php endif; ?>
-
-        </div>
-
-    <?php endif; ?>
+        <a
+            href="../index.php"
+            class="logo"
+        >
+            Fashion<span>Shop</span>
+        </a>
 
 
-    <?php if (empty($orders)): ?>
+        <nav class="nav">
 
-        <div class="empty">
-
-            <h2>Chưa có đơn hàng</h2>
-
-            <p>
-                Bạn chưa có đơn hàng nào.
-            </p>
-
-            <a
-                href="../products/index.php"
-                class="button"
-            >
-                Tiếp tục mua hàng
+            <a href="../index.php">
+                Trang chủ
             </a>
 
+            <a href="../products/index.php">
+                Sản phẩm
+            </a>
+
+            <a href="../products/index.php?category=1">
+                Áo
+            </a>
+
+            <a href="../products/index.php?category=2">
+                Quần
+            </a>
+
+            <a href="../products/index.php?category=3">
+                Váy
+            </a>
+
+        </nav>
+
+
+        <a
+            href="index.php"
+            class="cart"
+        >
+            Giỏ hàng
+
+            <span>
+                <?= count($_SESSION['cart'] ?? []) ?>
+            </span>
+
+        </a>
+
+    </div>
+
+</header>
+
+
+<!-- HISTORY -->
+
+<section class="history-page">
+
+    <div class="container">
+
+
+        <div class="history-title">
+
+            <div class="small-title">
+                ORDER HISTORY
+            </div>
+
+            <h1>
+                Lịch sử đơn hàng
+            </h1>
+
+            <p>
+                Theo dõi những đơn hàng bạn đã đặt tại Fashion Shop.
+            </p>
+
         </div>
 
-    <?php else: ?>
+
+        <?php if (empty($orders)): ?>
 
 
-        <?php foreach ($orders as $order): ?>
+            <div class="history-box">
 
-            <div class="order-box">
+                <div class="empty-history">
 
-                <div class="order-header">
+                    <h2>
+                        Chưa có đơn hàng
+                    </h2>
 
-                    <div class="order-id">
+                    <p>
+                        Bạn chưa thực hiện đơn hàng nào.
+                    </p>
 
-                        Đơn hàng #<?= (int) $order['id'] ?>
-
-                    </div>
-
-                    <div class="status">
-
-                        <?= htmlspecialchars(
-                            $order['status']
-                        ) ?>
-
-                    </div>
-
-                </div>
-
-
-                <div class="order-info">
-
-                    <div class="info-item">
-
-                        <span class="label">
-                            Người nhận:
-                        </span>
-
-                        <?= htmlspecialchars(
-                            $order['customer_name']
-                        ) ?>
-
-                    </div>
-
-
-                    <div class="info-item">
-
-                        <span class="label">
-                            Số điện thoại:
-                        </span>
-
-                        <?= htmlspecialchars(
-                            $order['phone']
-                        ) ?>
-
-                    </div>
-
-
-                    <div class="info-item">
-
-                        <span class="label">
-                            Địa chỉ:
-                        </span>
-
-                        <?= htmlspecialchars(
-                            $order['address']
-                        ) ?>
-                        </div>
-
-
-                    <div class="info-item">
-
-                        <span class="label">
-                            Ngày đặt:
-                        </span>
-
-                        <?= htmlspecialchars(
-                            $order['created_at']
-                        ) ?>
-
-                    </div>
-
-
-                    <?php if (!empty($order['note'])): ?>
-
-                        <div class="info-item">
-
-                            <span class="label">
-                                Ghi chú:
-                            </span>
-
-                            <?= htmlspecialchars(
-                                $order['note']
-                            ) ?>
-
-                        </div>
-
-                    <?php endif; ?>
+                    <a
+                        href="../products/index.php"
+                        class="history-btn"
+                    >
+                        Xem sản phẩm
+                    </a>
 
                 </div>
 
+            </div>
 
-                <div class="order-total">
 
-                    Tổng tiền:
+        <?php else: ?>
 
-                    <?= number_format(
-                        $order['total_amount'],
-                        0,
-                        ',',
-                        '.'
-                    ) ?>
 
-                    VNĐ
+            <div class="history-box">
 
-                </div>
+                <table class="history-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Mã đơn
+                            </th>
+
+                            <th>
+                                Người nhận
+                            </th>
+
+                            <th>
+                                Số điện thoại
+                            </th>
+
+                            <th>
+                                Địa chỉ
+                            </th>
+
+                            <th>
+                                Tổng tiền
+                            </th>
+
+                            <th>
+                                Trạng thái
+                            </th>
+
+                            <th>
+                                Ngày đặt
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+
+                        <?php foreach ($orders as $order): ?>
+
+
+                            <tr>
+
+                                <td class="order-id">
+
+                                    #<?= (int)$order['id'] ?>
+
+                                </td>
+
+
+                                <td>
+
+                                    <?= htmlspecialchars(
+                                        $order['receiver_name']
+                                    ) ?>
+
+                                </td>
+
+
+                                <td>
+
+                                    <?= htmlspecialchars(
+                                        $order['phone']
+                                    ) ?>
+
+                                </td>
+
+
+                                <td>
+
+                                    <?= htmlspecialchars(
+                                        $order['address']
+                                    ) ?>
+
+                                </td>
+
+
+                                <td class="order-price">
+
+                                    <?= number_format(
+                                        (float)$order['total_amount'],
+                                        0,
+                                        ',',
+                                        '.'
+                                    ) ?>đ
+
+                                </td>
+
+
+                                <td>
+
+                                    <span class="order-status">
+
+                                        <?= htmlspecialchars(
+                                            $order['status']
+                                        ) ?>
+
+                                    </span>
+
+                                </td>
+
+
+                                <td>
+
+                                    <?= date(
+                                        'd/m/Y H:i',
+                                        strtotime(
+                                            $order['created_at']
+                                        )
+                                    ) ?>
+
+                                </td>
+
+                            </tr>
+
+
+                        <?php endforeach; ?>
+
+
+                    </tbody>
+
+                </table>
 
 
                 <a
-                    href="order_detail.php?id=<?= (int) $order['id'] ?>"
-                    class="detail-button"
+                    href="index.php"
+                    class="back-cart"
                 >
-                    Xem chi tiết đơn hàng
+                    ← Quay lại giỏ hàng
                 </a>
 
             </div>
 
-        <?php endforeach; ?>
+
+        <?php endif; ?>
 
 
-    <?php endif; ?>
+    </div>
 
-</div>
+</section>
+
 
 </body>
 
