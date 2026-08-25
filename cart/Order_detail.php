@@ -21,10 +21,9 @@ if ($orderId <= 0) {
 $stmt = $pdo->prepare("
     SELECT
         id,
-        customer_name,
+        receiver_name,
         phone,
         address,
-        note,
         total_amount,
         status,
         created_at
@@ -44,17 +43,22 @@ if (!$order) {
 |--------------------------------------------------------------------------
 | LẤY CHI TIẾT ĐƠN HÀNG
 |--------------------------------------------------------------------------
+|
+| order_items không có product_name.
+| Lấy tên sản phẩm từ bảng products.
+|
 */
 
 $itemStmt = $pdo->prepare("
     SELECT
-        product_id,
-        product_name,
-        price,
-        quantity,
-        subtotal
-    FROM order_items
-    WHERE order_id = ?
+        oi.product_id,
+        p.name AS product_name,
+        oi.price,
+        oi.quantity
+    FROM order_items oi
+    LEFT JOIN products p
+        ON oi.product_id = p.id
+    WHERE oi.order_id = ?
 ");
 
 $itemStmt->execute([$orderId]);
@@ -150,7 +154,6 @@ $items = $itemStmt->fetchAll();
         Chi tiết đơn hàng #<?= (int) $order['id'] ?>
     </h1>
 
-
     <div class="box">
 
         <h2>Thông tin đơn hàng</h2>
@@ -158,13 +161,15 @@ $items = $itemStmt->fetchAll();
         <div class="info">
 
             <strong>Người nhận:</strong>
+
             <?= htmlspecialchars(
-                $order['customer_name']
+                $order['receiver_name']
             ) ?>
 
             <br>
 
             <strong>Số điện thoại:</strong>
+
             <?= htmlspecialchars(
                 $order['phone']
             ) ?>
@@ -172,6 +177,7 @@ $items = $itemStmt->fetchAll();
             <br>
 
             <strong>Địa chỉ:</strong>
+
             <?= htmlspecialchars(
                 $order['address']
             ) ?>
@@ -179,6 +185,7 @@ $items = $itemStmt->fetchAll();
             <br>
 
             <strong>Trạng thái:</strong>
+
             <?= htmlspecialchars(
                 $order['status']
             ) ?>
@@ -186,25 +193,14 @@ $items = $itemStmt->fetchAll();
             <br>
 
             <strong>Ngày đặt:</strong>
+
             <?= htmlspecialchars(
                 $order['created_at']
             ) ?>
 
-            <?php if (!empty($order['note'])): ?>
-
-                <br>
-
-                <strong>Ghi chú:</strong>
-                <?= htmlspecialchars(
-                    $order['note']
-                ) ?>
-
-            <?php endif; ?>
-
         </div>
 
     </div>
-
 
     <div class="box">
 
@@ -229,36 +225,52 @@ $items = $itemStmt->fetchAll();
 
             <?php foreach ($items as $item): ?>
 
+                <?php
+                $subtotal =
+                    $item['price'] * $item['quantity'];
+                ?>
+
                 <tr>
 
                     <td>
+
                         <?= htmlspecialchars(
                             $item['product_name']
+                                ?? 'Sản phẩm không còn tồn tại'
                         ) ?>
+
                     </td>
 
                     <td>
+
                         <?= number_format(
                             $item['price'],
                             0,
                             ',',
                             '.'
                         ) ?>
+
                         VNĐ
+
                     </td>
 
                     <td>
+
                         <?= (int) $item['quantity'] ?>
+
                     </td>
 
                     <td>
+
                         <?= number_format(
-                            $item['subtotal'],
+                            $subtotal,
                             0,
                             ',',
                             '.'
                         ) ?>
+
                         VNĐ
+
                     </td>
 
                 </tr>
@@ -268,7 +280,6 @@ $items = $itemStmt->fetchAll();
             </tbody>
 
         </table>
-
 
         <div class="total">
 
@@ -286,7 +297,6 @@ $items = $itemStmt->fetchAll();
         </div>
 
     </div>
-
 
     <a
         href="history.php"

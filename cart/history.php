@@ -5,33 +5,72 @@ require_once '../config/database.php';
 
 /*
 |--------------------------------------------------------------------------
+| LẤY USER ID NẾU ĐÃ ĐĂNG NHẬP
+|--------------------------------------------------------------------------
+*/
+
+$userId = $_SESSION['user_id'] ?? null;
+
+if ($userId === null && isset($_SESSION['user']['id'])) {
+    $userId = $_SESSION['user']['id'];
+}
+
+/*
+|--------------------------------------------------------------------------
 | LẤY DANH SÁCH ĐƠN HÀNG
 |--------------------------------------------------------------------------
 */
 
-$stmt = $pdo->query("
-    SELECT
-        id,
-        customer_name,
-        phone,
-        address,
-        note,
-        total_amount,
-        status,
-        created_at
-    FROM orders
-    ORDER BY id DESC
-");
+if ($userId !== null) {
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            receiver_name,
+            phone,
+            address,
+            total_amount,
+            status,
+            created_at
+        FROM orders
+        WHERE user_id = ?
+        ORDER BY id DESC
+    ");
+
+    $stmt->execute([$userId]);
+
+} else {
+
+    /*
+     * Trường hợp chưa có user_id trong session.
+     * Vẫn cho xem các đơn hàng để tránh làm hỏng chức năng hiện tại.
+     */
+
+    $stmt = $pdo->query("
+        SELECT
+            id,
+            receiver_name,
+            phone,
+            address,
+            total_amount,
+            status,
+            created_at
+        FROM orders
+        ORDER BY id DESC
+    ");
+}
 
 $orders = $stmt->fetchAll();
 
 /*
 |--------------------------------------------------------------------------
-| LẤY THÔNG BÁO ĐẶT HÀNG THÀNH CÔNG
+| THÔNG BÁO ĐẶT HÀNG THÀNH CÔNG
 |--------------------------------------------------------------------------
 */
 
-$success = isset($_GET['success']) && $_GET['success'] == '1';
+$success = isset($_GET['success'])
+    && $_GET['success'] == '1';
+
 $orderId = isset($_GET['order_id'])
     ? (int) $_GET['order_id']
     : 0;
@@ -183,7 +222,6 @@ $orderId = isset($_GET['order_id'])
 
     <h1>Lịch sử mua hàng</h1>
 
-
     <?php if ($success): ?>
 
         <div class="success">
@@ -200,7 +238,6 @@ $orderId = isset($_GET['order_id'])
         </div>
 
     <?php endif; ?>
-
 
     <?php if (empty($orders)): ?>
 
@@ -222,7 +259,6 @@ $orderId = isset($_GET['order_id'])
         </div>
 
     <?php else: ?>
-
 
         <?php foreach ($orders as $order): ?>
 
@@ -246,21 +282,18 @@ $orderId = isset($_GET['order_id'])
 
                 </div>
 
-
                 <div class="order-info">
 
                     <div class="info-item">
-
                         <span class="label">
                             Người nhận:
                         </span>
 
                         <?= htmlspecialchars(
-                            $order['customer_name']
+                            $order['receiver_name']
                         ) ?>
 
                     </div>
-
 
                     <div class="info-item">
 
@@ -274,7 +307,6 @@ $orderId = isset($_GET['order_id'])
 
                     </div>
 
-
                     <div class="info-item">
 
                         <span class="label">
@@ -284,8 +316,8 @@ $orderId = isset($_GET['order_id'])
                         <?= htmlspecialchars(
                             $order['address']
                         ) ?>
-                        </div>
 
+                    </div>
 
                     <div class="info-item">
 
@@ -299,25 +331,7 @@ $orderId = isset($_GET['order_id'])
 
                     </div>
 
-
-                    <?php if (!empty($order['note'])): ?>
-
-                        <div class="info-item">
-
-                            <span class="label">
-                                Ghi chú:
-                            </span>
-
-                            <?= htmlspecialchars(
-                                $order['note']
-                            ) ?>
-
-                        </div>
-
-                    <?php endif; ?>
-
                 </div>
-
 
                 <div class="order-total">
 
@@ -334,9 +348,8 @@ $orderId = isset($_GET['order_id'])
 
                 </div>
 
-
                 <a
-                    href="order_detail.php?id=<?= (int) $order['id'] ?>"
+                    href="Order_detail.php?id=<?= (int) $order['id'] ?>"
                     class="detail-button"
                 >
                     Xem chi tiết đơn hàng
@@ -345,7 +358,6 @@ $orderId = isset($_GET['order_id'])
             </div>
 
         <?php endforeach; ?>
-
 
     <?php endif; ?>
 

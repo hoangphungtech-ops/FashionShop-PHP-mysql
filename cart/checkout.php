@@ -3,6 +3,12 @@ session_start();
 
 require_once '../config/database.php';
 
+/*
+|--------------------------------------------------------------------------
+| LẤY GIỎ HÀNG
+|--------------------------------------------------------------------------
+*/
+
 $cart = $_SESSION['cart'] ?? [];
 
 if (empty($cart)) {
@@ -12,9 +18,22 @@ if (empty($cart)) {
 
 /*
 |--------------------------------------------------------------------------
+| LẤY USER ID NẾU ĐÃ ĐĂNG NHẬP
+|--------------------------------------------------------------------------
+*/
+
+$userId = $_SESSION['user_id'] ?? null;
+
+if ($userId === null && isset($_SESSION['user']['id'])) {
+    $userId = $_SESSION['user']['id'];
+}
+
+/*
+|--------------------------------------------------------------------------
 | TÍNH TỔNG ĐƠN HÀNG
 |--------------------------------------------------------------------------
 */
+
 $total = 0;
 
 foreach ($cart as $item) {
@@ -28,24 +47,31 @@ $error = '';
 | XỬ LÝ ĐẶT HÀNG
 |--------------------------------------------------------------------------
 */
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $customerName = trim($_POST['customer_name'] ?? '');
+    $receiverName = trim($_POST['receiver_name'] ?? '');
     $phone        = trim($_POST['phone'] ?? '');
     $address      = trim($_POST['address'] ?? '');
-    $note         = trim($_POST['note'] ?? '');
 
     /*
     |--------------------------------------------------------------------------
     | KIỂM TRA THÔNG TIN
     |--------------------------------------------------------------------------
     */
-    if ($customerName === '') {
+
+    if ($receiverName === '') {
+
         $error = 'Vui lòng nhập họ và tên.';
+
     } elseif ($phone === '') {
+
         $error = 'Vui lòng nhập số điện thoại.';
+
     } elseif ($address === '') {
+
         $error = 'Vui lòng nhập địa chỉ nhận hàng.';
+
     } else {
 
         try {
@@ -55,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             | BẮT ĐẦU TRANSACTION
             |--------------------------------------------------------------------------
             */
+
             $pdo->beginTransaction();
 
             /*
@@ -62,67 +89,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             | LƯU ĐƠN HÀNG
             |--------------------------------------------------------------------------
             */
+
             $stmt = $pdo->prepare("
                 INSERT INTO orders
                 (
-                    customer_name,
+                    user_id,
+                    receiver_name,
                     phone,
                     address,
-                    note,
                     total_amount,
                     status
                 )
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
 
-            $status = 'Pending';
+            $status = 'pending';
 
             $stmt->execute([
-                $customerName,
+                $userId,
+                $receiverName,
                 $phone,
                 $address,
-                $note,
                 $total,
                 $status
             ]);
 
             /*
             |--------------------------------------------------------------------------
-            | LẤY ID ĐƠN HÀNG VỪA TẠO
+            | LẤY ID ĐƠN HÀNG
             |--------------------------------------------------------------------------
             */
+
             $orderId = $pdo->lastInsertId();
 
             /*
             |--------------------------------------------------------------------------
             | LƯU CHI TIẾT ĐƠN HÀNG
             |--------------------------------------------------------------------------
+            |
+            | Database chung chỉ có:
+            | id
+            | order_id
+            | product_id
+            | quantity
+            | price
+            |
             */
+
             $itemStmt = $pdo->prepare("
                 INSERT INTO order_items
                 (
                     order_id,
-                    productid,
-                    product_name,
-                    price,
+                    product_id,
                     quantity,
-                    subtotal
+                    price
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?)
             ");
 
             foreach ($cart as $item) {
 
-                $subtotal =
-                    $item['price'] * $item['quantity'];
-
                 $itemStmt->execute([
                     $orderId,
                     $item['id'],
-                    $item['name'],
-                    $item['price'],
                     $item['quantity'],
-                    $subtotal
+                    $item['price']
                 ]);
             }
 
@@ -131,13 +162,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             | HOÀN TẤT TRANSACTION
             |--------------------------------------------------------------------------
             */
+
             $pdo->commit();
 
             /*
             |--------------------------------------------------------------------------
-            | XÓA GIỎ HÀNG SAU KHI ĐẶT HÀNG THÀNH CÔNG
+            | XÓA GIỎ HÀNG
             |--------------------------------------------------------------------------
             */
+
             $_SESSION['cart'] = [];
 
             /*
@@ -145,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             | CHUYỂN SANG LỊCH SỬ ĐƠN HÀNG
             |--------------------------------------------------------------------------
             */
+
             header(
                 'Location: history.php?success=1&order_id=' .
                 urlencode($orderId)
@@ -159,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             | ROLLBACK NẾU CÓ LỖI
             |--------------------------------------------------------------------------
             */
+
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
@@ -331,16 +366,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="form-group">
 
-                    <label for="customer_name">
+                    <label for="receiver_name">
                         Họ và tên *
                     </label>
 
                     <input
                         type="text"
-                        id="customer_name"
-                        name="customer_name"
+                        id="receiver_name"
+                        name="receiver_name"
                         value="<?= htmlspecialchars(
-                            $_POST['customer_name'] ?? ''
+                            $_POST['receiver_name'] ?? ''
                         ) ?>"
                         required
                     >
@@ -351,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <label for="phone">
                         Số điện thoại *
-                        </label>
+                    </label>
 
                     <input
                         type="tel"
@@ -381,20 +416,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 </div>
 
-                <div class="form-group">
-
-                    <label for="note">
-                        Ghi chú
-                    </label>
-
-                    <textarea
-                        id="note"
-                        name="note"
-                    ><?= htmlspecialchars(
-                        $_POST['note'] ?? ''
-                    ) ?></textarea>
-
-                </div>
                 <button
 
                     type="submit"
@@ -455,7 +476,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                             Số lượng:
 
-                            <?= $item['quantity'] ?>
+                            <?= (int) $item['quantity'] ?>
 
                         </small>
 
@@ -516,4 +537,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </body>
 
 </html>
-            
