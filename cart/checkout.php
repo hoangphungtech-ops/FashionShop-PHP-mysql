@@ -1,270 +1,175 @@
 <?php
+session_start();
 
-require_once __DIR__ . "/../includes/db.php";
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-
-/* =========================
-   KIỂM TRA GIỎ HÀNG
-========================= */
+require_once '../config/database.php';
 
 $cart = $_SESSION['cart'] ?? [];
 
 if (empty($cart)) {
-    header("Location: index.php");
+    header('Location: index.php');
     exit;
 }
 
-
-/* =========================
-   LẤY SẢN PHẨM
-========================= */
-
-$products = [];
+/*
+|--------------------------------------------------------------------------
+| TÍNH TỔNG ĐƠN HÀNG
+|--------------------------------------------------------------------------
+*/
 $total = 0;
 
-$ids = array_keys($cart);
-
-$ids = array_map('intval', $ids);
-
-$ids = array_filter($ids, function ($id) {
-    return $id > 0;
-});
-
-
-if (!empty($ids)) {
-
-    $placeholders = implode(
-        ',',
-        array_fill(0, count($ids), '?')
-    );
-
-    try {
-
-        $sql = "SELECT *
-                FROM products
-                WHERE id IN ($placeholders)
-                AND status = 1";
-
-        $stmt = $pdo->prepare($sql);
-
-        $stmt->execute($ids);
-
-        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    } catch (PDOException $e) {
-
-        die("Lỗi database: " . $e->getMessage());
-
-    }
+foreach ($cart as $item) {
+    $total += $item['price'] * $item['quantity'];
 }
 
+$error = '';
 
-/* =========================
-   TÍNH TỔNG
-========================= */
-
-foreach ($products as $product) {
-
-    $productId = (int)$product['id'];
-
-    $quantity = (int)(
-        $cart[$productId] ?? 0
-    );
-
-    if ($quantity <= 0) {
-        continue;
-    }
-
-    $price = (float)(
-        $product['price'] ?? 0
-    );
-
-    $total += $price * $quantity;
-}
-
-
-/* =========================
-   XỬ LÝ ĐẶT HÀNG
-========================= */
-
-$error = "";
-$success = false;
-
+/*
+|--------------------------------------------------------------------------
+| XỬ LÝ ĐẶT HÀNG
+|--------------------------------------------------------------------------
+*/
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $name = trim(
-        $_POST['name'] ?? ''
-    );
+    $customerName = trim($_POST['customer_name'] ?? '');
+    $phone        = trim($_POST['phone'] ?? '');
+    $address      = trim($_POST['address'] ?? '');
+    $note         = trim($_POST['note'] ?? '');
 
-    $phone = trim(
-        $_POST['phone'] ?? ''
-    );
-
-    $address = trim(
-        $_POST['address'] ?? ''
-    );
-
-
-    if (
-        $name === '' ||
-        $phone === '' ||
-        $address === ''
-    ) {
-
-        $error = "Vui lòng nhập đầy đủ thông tin.";
-
+    /*
+    |--------------------------------------------------------------------------
+    | KIỂM TRA THÔNG TIN
+    |--------------------------------------------------------------------------
+    */
+    if ($customerName === '') {
+        $error = 'Vui lòng nhập họ và tên.';
+    } elseif ($phone === '') {
+        $error = 'Vui lòng nhập số điện thoại.';
+    } elseif ($address === '') {
+        $error = 'Vui lòng nhập địa chỉ nhận hàng.';
     } else {
 
         try {
 
-            $userId = $_SESSION['user_id'] ?? null;
+            /*
+            |--------------------------------------------------------------------------
+            | BẮT ĐẦU TRANSACTION
+            |--------------------------------------------------------------------------
+            */
+            $pdo->beginTransaction();
 
+            /*
+            |--------------------------------------------------------------------------
+            | LƯU ĐƠN HÀNG
+            |--------------------------------------------------------------------------
+            */
+            $stmt = $pdo->prepare("
+                INSERT INTO orders
+                (
+                    customer_name,
+                    phone,
+                    address,
+                    note,
+                    total_amount,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
 
-            /* =========================
-               TẠO ĐƠN HÀNG
-            ========================= */
-
-            $sql = "INSERT INTO orders
-                    (
-                        user_id,
-                        receiver_name,
-                        phone,
-                        address,
-                        total_amount,
-                        status
-                    )
-                    VALUES
-                    (
-                        :user_id,
-                        :receiver_name,
-                        :phone,
-                        :address,
-                        :total_amount,
-                        'pending'
-                    )";
-
-            $stmt = $pdo->prepare($sql);
+            $status = 'Pending';
 
             $stmt->execute([
-
-                ':user_id' =>
-                    $userId,
-
-                ':receiver_name' =>
-                    $name,
-
-                ':phone' =>
-                    $phone,
-
-                ':address' =>
-                    $address,
-
-                ':total_amount' =>
-                    $total
-
+                $customerName,
+                $phone,
+                $address,
+                $note,
+                $total,
+                $status
             ]);
 
-
-            /* =========================
-               LẤY ID ĐƠN HÀNG
-            ========================= */
-
+            /*
+            |--------------------------------------------------------------------------
+            | LẤY ID ĐƠN HÀNG VỪA TẠO
+            |--------------------------------------------------------------------------
+            */
             $orderId = $pdo->lastInsertId();
 
+            /*
+            |--------------------------------------------------------------------------
+            | LƯU CHI TIẾT ĐƠN HÀNG
+            |--------------------------------------------------------------------------
+            */
+            $itemStmt = $pdo->prepare("
+                INSERT INTO order_items
+                (
+                    order_id,
+                    productid,
+                    product_name,
+                    price,
+                    quantity,
+                    subtotal
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
 
-            /* =========================
-               LƯU ORDER ITEMS
-            ========================= */
+            foreach ($cart as $item) {
 
-            $itemSql = "INSERT INTO order_items
-                        (
-                            order_id,
-                            product_id,
-                            quantity,
-                            price
-                        )
-                        VALUES
-                        (
-                            :order_id,
-                            :product_id,
-                            :quantity,
-                            :price
-                        )";
-
-            $itemStmt = $pdo->prepare($itemSql);
-
-
-            foreach ($products as $product) {
-
-                $productId =
-                    (int)$product['id'];
-
-                $quantity =
-                    (int)(
-                        $cart[$productId]
-                        ?? 0
-                    );
-
-                if ($quantity <= 0) {
-                    continue;
-                }
-
-                $price =
-                    (float)(
-                        $product['price']
-                        ?? 0
-                    );
-
+                $subtotal =
+                    $item['price'] * $item['quantity'];
 
                 $itemStmt->execute([
-
-                    ':order_id' =>
-                        $orderId,
-
-                    ':product_id' =>
-                        $productId,
-
-                    ':quantity' =>
-                        $quantity,
-
-                    ':price' =>
-                        $price
-
+                    $orderId,
+                    $item['id'],
+                    $item['name'],
+                    $item['price'],
+                    $item['quantity'],
+                    $subtotal
                 ]);
-
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | HOÀN TẤT TRANSACTION
+            |--------------------------------------------------------------------------
+            */
+            $pdo->commit();
 
-            /* =========================
-               XÓA GIỎ HÀNG
-            ========================= */
-
+            /*
+            |--------------------------------------------------------------------------
+            | XÓA GIỎ HÀNG SAU KHI ĐẶT HÀNG THÀNH CÔNG
+            |--------------------------------------------------------------------------
+            */
             $_SESSION['cart'] = [];
 
-            $success = true;
+            /*
+            |--------------------------------------------------------------------------
+            | CHUYỂN SANG LỊCH SỬ ĐƠN HÀNG
+            |--------------------------------------------------------------------------
+            */
+            header(
+                'Location: history.php?success=1&order_id=' .
+                urlencode($orderId)
+            );
 
+            exit;
 
         } catch (PDOException $e) {
 
-            $error =
-                "Không thể đặt hàng: "
-                . $e->getMessage();
+            /*
+            |--------------------------------------------------------------------------
+            | ROLLBACK NẾU CÓ LỖI
+            |--------------------------------------------------------------------------
+            */
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
 
+            $error = 'Đặt hàng thất bại. Vui lòng thử lại.';
         }
-
     }
-
 }
-
 ?>
 
-
 <!DOCTYPE html>
-
 <html lang="vi">
 
 <head>
@@ -276,190 +181,121 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>
-        Thanh toán - Fashion Shop
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="../assets/css/style.css"
-    >
+    <title>Thanh toán - Fashion Shop</title>
 
     <style>
 
-        .checkout-page {
-            padding: 70px 0 90px;
-            background: #f8fbf7;
-            min-height: 650px;
+        * {
+            box-sizing: border-box;
         }
 
-        .checkout-title {
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1100px;
+            margin: 40px auto;
+        }
+
+        h1 {
             text-align: center;
-            margin-bottom: 45px;
+            margin-bottom: 30px;
         }
 
-        .checkout-title h1 {
-            font-size: 42px;
-            color: #263126;
-            margin-bottom: 12px;
-        }
-
-        .checkout-title p {
-            color: #697369;
-        }
-
-        .checkout-layout {
+        .checkout {
             display: grid;
-            grid-template-columns: 1.4fr 0.8fr;
-            gap: 30px;
+            grid-template-columns: 1fr 400px;
+            gap: 25px;
         }
 
-        .checkout-box {
-            background: #ffffff;
-            border: 1px solid #e3e9e3;
-            padding: 30px;
+        .box {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
         }
 
-        .checkout-box h2 {
-            color: #263126;
-            font-size: 23px;
-            margin-bottom: 25px;
+        .box h2 {
+            margin-top: 0;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
-        .form-group label {
+        label {
             display: block;
-            margin-bottom: 8px;
-            color: #263126;
-            font-size: 14px;
-            font-weight: 700;
+            margin-bottom: 7px;
+            font-weight: bold;
         }
 
-        .form-group input,
-        .form-group textarea {
+        input,
+        textarea {
             width: 100%;
-            padding: 13px 14px;
-            border: 1px solid #d9e0da;
-            background: #ffffff;
-            color: #263126;
-            font-family: inherit;
-            font-size: 14px;
-            outline: none;
+            padding: 11px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 15px;
         }
 
-        .form-group textarea {
-            min-height: 110px;
+        textarea {
+            min-height: 100px;
             resize: vertical;
         }
 
-        .checkout-submit {
-            width: 100%;
-            margin-top: 15px;
-            min-height: 50px;
-            border: none;
-            background: #263126;
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .checkout-submit:hover {
-            background: #78917d;
-        }
-
-        .checkout-back {
-            display: inline-block;
-            margin-top: 15px;
-            color: #78917d;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .checkout-error {
-            margin-bottom: 25px;
-            padding: 14px 16px;
-            background: #fff1f1;
-            border: 1px solid #e8caca;
-            color: #9a4545;
-        }
-
-        .checkout-success {
-            background: #ffffff;
-            border: 1px solid #dce7dd;
-            padding: 60px 30px;
-            text-align: center;
-        }
-
-        .checkout-success h2 {
-            color: #263126;
-            font-size: 30px;
-            margin-bottom: 15px;
-        }
-
-        .checkout-success p {
-            color: #697369;
-            margin-bottom: 25px;
-        }
-
-        .success-btn {
-            display: inline-flex;
-            padding: 13px 25px;
-            background: #263126;
-            color: #ffffff;
-            font-weight: 700;
+        .error {
+            background: #f8d7da;
+            color: #842029;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
         }
 
         .order-item {
             display: flex;
             justify-content: space-between;
             gap: 15px;
-            padding: 15px 0;
-            border-bottom: 1px solid #e5eae5;
+            padding: 12px 0;
+            border-bottom: 1px solid #ddd;
         }
 
         .order-item-name {
-            color: #263126;
-            font-weight: 600;
+            flex: 1;
         }
 
-        .order-item-quantity {
-            color: #7a837b;
-            font-size: 13px;
-            margin-top: 5px;
-        }
-
-        .order-item-price {
-            color: #263126;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .order-total {
+        .total {
             display: flex;
             justify-content: space-between;
-            margin-top: 25px;
-            padding-top: 20px;
-            border-top: 2px solid #263126;
-        }
-
-        .order-total strong {
+            margin-top: 20px;
             font-size: 20px;
-            color: #263126;
+            font-weight: bold;
         }
 
-        .order-total span {
-            font-size: 22px;
-            font-weight: 700;
-            color: #78917d;
+        .button {
+            width: 100%;
+            padding: 13px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 6px;
+            background: #198754;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .back {
+            display: inline-block;
+            margin-top: 15px;
+            color: #333;
+            text-decoration: none;
         }
 
         @media (max-width: 800px) {
 
-            .checkout-layout {
+            .checkout {
                 grid-template-columns: 1fr;
             }
 
@@ -469,317 +305,215 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 </head>
 
-
 <body>
 
+<div class="container">
 
-<header class="header">
+    <h1>Thanh toán & Đặt hàng</h1>
 
-    <div class="container header-content">
+    <?php if ($error !== ''): ?>
 
-        <a
-            href="../index.php"
-            class="logo"
-        >
-            Fashion<span>Shop</span>
-        </a>
+        <div class="error">
+            <?= htmlspecialchars($error) ?>
+        </div>
 
+    <?php endif; ?>
 
-        <nav class="nav">
+    <div class="checkout">
 
-            <a href="../index.php">
-                Trang chủ
+        <!-- THÔNG TIN NHẬN HÀNG -->
+
+        <div class="box">
+
+            <h2>Thông tin nhận hàng</h2>
+
+            <form method="POST">
+
+                <div class="form-group">
+
+                    <label for="customer_name">
+                        Họ và tên *
+                    </label>
+
+                    <input
+                        type="text"
+                        id="customer_name"
+                        name="customer_name"
+                        value="<?= htmlspecialchars(
+                            $_POST['customer_name'] ?? ''
+                        ) ?>"
+                        required
+                    >
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="phone">
+                        Số điện thoại *
+                        </label>
+
+                    <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        value="<?= htmlspecialchars(
+                            $_POST['phone'] ?? ''
+                        ) ?>"
+                        required
+                    >
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="address">
+                        Địa chỉ nhận hàng *
+                    </label>
+
+                    <textarea
+                        id="address"
+                        name="address"
+                        required
+                    ><?= htmlspecialchars(
+                        $_POST['address'] ?? ''
+                    ) ?></textarea>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label for="note">
+                        Ghi chú
+                    </label>
+
+                    <textarea
+                        id="note"
+                        name="note"
+                    ><?= htmlspecialchars(
+                        $_POST['note'] ?? ''
+                    ) ?></textarea>
+
+                </div>
+                <button
+
+                    type="submit"
+
+                    class="button"
+
+                >
+
+                    Xác nhận đặt hàng
+
+                </button>
+
+            </form>
+
+            <a
+
+                href="index.php"
+
+                class="back"
+
+            >
+
+                ← Quay lại giỏ hàng
+
             </a>
-
-            <a href="../products/index.php">
-                Sản phẩm
-            </a>
-
-            <a href="../products/index.php?category=1">
-                Áo
-            </a>
-
-            <a href="../products/index.php?category=2">
-                Quần
-            </a>
-
-            <a href="../products/index.php?category=3">
-                Váy
-            </a>
-
-        </nav>
-
-
-        <a
-            href="index.php"
-            class="cart"
-        >
-            Giỏ hàng
-            <span>
-                <?= count($_SESSION['cart'] ?? []) ?>
-            </span>
-        </a>
-
-    </div>
-
-</header>
-
-
-<section class="checkout-page">
-
-    <div class="container">
-
-
-        <div class="checkout-title">
-
-            <div class="small-title">
-                CHECKOUT
-            </div>
-
-            <h1>
-                Thanh toán
-            </h1>
-
-            <p>
-                Nhập thông tin nhận hàng để hoàn tất đơn hàng.
-            </p>
 
         </div>
 
+        <!-- TÓM TẮT ĐƠN HÀNG -->
 
-        <?php if ($success): ?>
+        <div class="box">
 
+            <h2>Đơn hàng của bạn</h2>
 
-            <div class="checkout-success">
+            <?php foreach ($cart as $item): ?>
 
-                <h2>
-                    Đặt hàng thành công!
-                </h2>
+                <?php
 
-                <p>
-                    Đơn hàng của bạn đã được ghi nhận.
-                </p>
+                $subtotal =
 
-                <a
-                    href="history.php"
-                    class="success-btn"
-                >
-                    Xem lịch sử đơn hàng
-                </a>
+                    $item['price'] * $item['quantity'];
 
-            </div>
+                ?>
 
+                <div class="order-item">
 
-        <?php else: ?>
+                    <div class="order-item-name">
 
+                        <?= htmlspecialchars(
 
-            <?php if ($error !== ""): ?>
+                            $item['name']
 
-                <div class="checkout-error">
+                        ) ?>
 
-                    <?= htmlspecialchars($error) ?>
+                        <br>
 
-                </div>
+                        <small>
 
-            <?php endif; ?>
+                            Số lượng:
 
+                            <?= $item['quantity'] ?>
 
-            <div class="checkout-layout">
-
-
-                <!-- THÔNG TIN NHẬN HÀNG -->
-
-                <div class="checkout-box">
-
-                    <h2>
-                        Thông tin nhận hàng
-                    </h2>
-
-
-                    <form
-                        method="POST"
-                        action=""
-                    >
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Họ và tên
-                            </label>
-
-                            <input
-                                type="text"
-                                name="name"
-                                placeholder="Nhập họ và tên"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Số điện thoại
-                            </label>
-
-                            <input
-                                type="text"
-                                name="phone"
-                                placeholder="Nhập số điện thoại"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Địa chỉ nhận hàng
-                            </label>
-
-                            <textarea
-                                name="address"
-                                placeholder="Nhập địa chỉ nhận hàng"
-                                required
-                            ></textarea>
-
-                        </div>
-
-
-                        <button
-                            type="submit"
-                            class="checkout-submit"
-                        >
-                            Xác nhận đặt hàng
-                        </button>
-
-
-                    </form>
-
-
-                    <a
-                        href="index.php"
-                        class="checkout-back"
-                    >
-                        ← Quay lại giỏ hàng
-                    </a>
-
-                </div>
-
-
-                <!-- ĐƠN HÀNG -->
-
-                <div class="checkout-box">
-
-                    <h2>
-                        Đơn hàng của bạn
-                    </h2>
-
-
-                    <?php foreach ($products as $product): ?>
-
-                        <?php
-
-                        $productId =
-                            (int)$product['id'];
-
-                        $quantity =
-                            (int)(
-                                $cart[$productId]
-                                ?? 0
-                            );
-
-                        if ($quantity <= 0) {
-                            continue;
-                        }
-
-                        $price =
-                            (float)(
-                                $product['price']
-                                ?? 0
-                            );
-
-                        $subtotal =
-                            $price * $quantity;
-
-                        ?>
-
-
-                        <div class="order-item">
-
-                            <div>
-
-                                <div class="order-item-name">
-
-                                    <?= htmlspecialchars(
-                                        $product['name']
-                                    ) ?>
-
-                                </div>
-
-                                <div class="order-item-quantity">
-
-                                    Số lượng:
-                                    <?= $quantity ?>
-
-                                </div>
-
-                            </div>
-
-
-                            <div class="order-item-price">
-
-                                <?= number_format(
-                                    $subtotal,
-                                    0,
-                                    ',',
-                                    '.'
-                                ) ?>đ
-
-                            </div>
-
-                        </div>
-
-
-                    <?php endforeach; ?>
-
-
-                    <div class="order-total">
-
-                        <strong>
-                            Tổng cộng
-                        </strong>
-
-                        <span>
-
-                            <?= number_format(
-                                $total,
-                                0,
-                                ',',
-                                '.'
-                            ) ?>đ
-
-                        </span>
+                        </small>
 
                     </div>
 
+                    <strong>
+
+                        <?= number_format(
+
+                            $subtotal,
+
+                            0,
+
+                            ',',
+
+                            '.'
+
+                        ) ?>
+
+                        VNĐ
+
+                    </strong>
+
                 </div>
 
+            <?php endforeach; ?>
+
+            <div class="total">
+
+                <span>Tổng cộng:</span>
+
+                <span>
+
+                    <?= number_format(
+
+                        $total,
+
+                        0,
+
+                        ',',
+
+                        '.'
+
+                    ) ?>
+
+                    VNĐ
+
+                </span>
 
             </div>
 
-
-        <?php endif; ?>
-
+        </div>
 
     </div>
 
-</section>
-
+</div>
 
 </body>
 
 </html>
+            

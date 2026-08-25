@@ -1,754 +1,427 @@
 <?php
+session_start();
 
-require_once __DIR__ . "/../includes/db.php";
+require_once '../config/database.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+/*
+|--------------------------------------------------------------------------
+| Khởi tạo giỏ hàng
+|--------------------------------------------------------------------------
+*/
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
 }
 
 /*
 |--------------------------------------------------------------------------
-| LẤY GIỎ HÀNG
+| Thêm sản phẩm vào giỏ
+| URL dự kiến:
+| cart/index.php?action=add&id=1
 |--------------------------------------------------------------------------
-| Giả sử giỏ hàng được lưu trong session:
-| $_SESSION['cart'][product_id] = số lượng
 */
+if (isset($_GET['action']) && $_GET['action'] === 'add' && isset($_GET['id'])) {
 
-$cart = $_SESSION['cart'] ?? [];
+    $productId = (int) $_GET['id'];
 
-$products = [];
-$total = 0;
+    if ($productId > 0) {
 
-if (!empty($cart)) {
+        /*
+         * Kiểm tra sản phẩm tồn tại.
+         * Tên bảng/cột products sẽ được kết nối với phần
+         * sản phẩm của nhóm khi phần đó được hoàn thiện.
+         */
+        $stmt = $pdo->prepare(
+            "SELECT id, name, price FROM products WHERE id = ?"
+        );
 
-    $ids = array_keys($cart);
+        $stmt->execute([$productId]);
 
-    $ids = array_map('intval', $ids);
+        $product = $stmt->fetch();
 
-    $ids = array_filter($ids, function ($id) {
-        return $id > 0;
-    });
+        if ($product) {
 
-    if (!empty($ids)) {
-
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-
-        try {
-
-            $sql = "SELECT *
-                    FROM products
-                    WHERE id IN ($placeholders)
-                    AND status = 1";
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($ids);
-
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } catch (PDOException $e) {
-
-            die("Lỗi database: " . $e->getMessage());
-
+            if (isset($_SESSION['cart'][$productId])) {
+                $_SESSION['cart'][$productId]['quantity']++;
+            } else {
+                $_SESSION['cart'][$productId] = [
+                    'id' => $product['id'],
+                    'name' => $product['name'],
+                    'price' => $product['price'],
+                    'quantity' => 1
+                ];
+            }
         }
     }
+
+    header('Location: index.php');
+    exit;
 }
 
+/*
+|--------------------------------------------------------------------------
+| Xóa sản phẩm
+|--------------------------------------------------------------------------
+*/
+if (isset($_GET['action']) && $_GET['action'] === 'remove') {
+
+    $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+    if (isset($_SESSION['cart'][$productId])) {
+        unset($_SESSION['cart'][$productId]);
+    }
+
+    header('Location: index.php');
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Tăng số lượng
+|--------------------------------------------------------------------------
+*/
+if (isset($_GET['action']) && $_GET['action'] === 'increase') {
+
+    $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+    if (isset($_SESSION['cart'][$productId])) {
+        $_SESSION['cart'][$productId]['quantity']++;
+    }
+
+    header('Location: index.php');
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Giảm số lượng
+|--------------------------------------------------------------------------
+*/
+if (isset($_GET['action']) && $_GET['action'] === 'decrease') {
+
+    $productId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+
+    if (isset($_SESSION['cart'][$productId])) {
+
+        if ($_SESSION['cart'][$productId]['quantity'] > 1) {
+            $_SESSION['cart'][$productId]['quantity']--;
+            } else {
+            unset($_SESSION['cart'][$productId]);
+        }
+    }
+
+    header('Location: index.php');
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Cập nhật số lượng
+|--------------------------------------------------------------------------
+*/
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && isset($_POST['update_cart'])) {
+
+    if (isset($_POST['quantity']) && is_array($_POST['quantity'])) {
+
+        foreach ($_POST['quantity'] as $productId => $quantity) {
+
+            $productId = (int) $productId;
+            $quantity = (int) $quantity;
+
+            if (!isset($_SESSION['cart'][$productId])) {
+                continue;
+            }
+
+            if ($quantity <= 0) {
+                unset($_SESSION['cart'][$productId]);
+            } else {
+                $_SESSION['cart'][$productId]['quantity'] = $quantity;
+            }
+        }
+    }
+
+    header('Location: index.php');
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
+| Tính tổng tiền
+|--------------------------------------------------------------------------
+*/
+$total = 0;
+
+foreach ($_SESSION['cart'] as $item) {
+    $total += $item['price'] * $item['quantity'];
+}
 ?>
 
 <!DOCTYPE html>
-
 <html lang="vi">
 
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Giỏ hàng - Fashion Shop</title>
 
-    <link
-        rel="stylesheet"
-        href="../assets/css/style.css"
-    >
-
     <style>
-
-        .cart-page {
-            padding: 70px 0 90px;
-            background: #f8fbf7;
-            min-height: 600px;
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            margin: 0;
         }
 
-        .cart-title {
+        .container {
+            width: 90%;
+            max-width: 1100px;
+            margin: 40px auto;
+        }
+
+        h1 {
             text-align: center;
-            margin-bottom: 45px;
-        }
-
-        .cart-title .small-title {
-            margin-bottom: 10px;
-        }
-
-        .cart-title h1 {
-            font-size: 42px;
-            color: #263126;
-            margin-bottom: 12px;
-        }
-
-        .cart-title p {
-            color: #697369;
-            font-size: 15px;
         }
 
         .cart-box {
-            background: #ffffff;
-            border: 1px solid #e3e9e3;
-            padding: 30px;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
         }
 
-        .cart-table {
+        table {
             width: 100%;
             border-collapse: collapse;
         }
 
-        .cart-table th {
+        th,
+        td {
             padding: 15px;
-            background: #263126;
-            color: #ffffff;
-            text-align: left;
-            font-size: 13px;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
         }
 
-        .cart-table td {
-            padding: 18px 15px;
-            border-bottom: 1px solid #e6ebe6;
-            color: #394239;
-            vertical-align: middle;
+        th {
+            background: #f2f2f2;
         }
 
-        .cart-product {
+        .quantity {
             display: flex;
+            justify-content: center;
             align-items: center;
-            gap: 15px;
+            gap: 8px;
         }
 
-        .cart-product img {
-            width: 80px;
-            height: 90px;
-            object-fit: cover;
-            background: #f2f4f2;
+        .quantity a {
+            text-decoration: none;
+            background: #ddd;
+            color: #000;
+            padding: 5px 10px;
+            border-radius: 4px;
         }
 
-        .cart-product-name {
-            font-weight: 700;
-            color: #263126;
+        .quantity input {
+            width: 50px;
+            text-align: center;
+            padding: 5px;
         }
 
-        .cart-price {
-            font-weight: 600;
+        .remove {
+            color: red;
+            text-decoration: none;
         }
 
-        .cart-quantity {
-            font-weight: 700;
-        }
-
-        .cart-total {
-            font-weight: 700;
-            color: #263126;
-        }
-
-        .cart-summary {
-            margin-top: 30px;
+        .bottom {
+            margin-top: 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
         }
 
-        .cart-grand-total {
-            font-size: 22px;
-            font-weight: 700;
-            color: #263126;
+        .button {
+            padding: 10px 18px;
+            border-radius: 5px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
         }
 
-        .cart-grand-total span {
-            color: #78917d;
+        .update {
+            background: #333;
+            color: white;
         }
 
-        .cart-actions {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+        .checkout {
+            background: #198754;
+            color: white;
         }
 
-        .cart-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 48px;
-            padding: 0 24px;
-            font-size: 14px;
-            font-weight: 700;
-            transition: 0.3s ease;
+        .total {
+            font-size: 20px;
+            font-weight: bold;
         }
 
-        .continue-btn {
-            border: 1px solid #78917d;
-            color: #78917d;
-            background: #ffffff;
-        }
-
-        .continue-btn:hover {
-            background: #edf4ee;
-        }
-
-        .checkout-btn {
-            border: 1px solid #263126;
-            background: #263126;
-            color: #ffffff;
-        }
-
-        .checkout-btn:hover {
-            background: #78917d;
-            border-color: #78917d;
-        }
-
-        .cart-empty {
+        .empty {
             text-align: center;
-            padding: 80px 20px;
+            padding: 40px;
         }
-
-        .cart-empty h2 {
-            color: #263126;
-            margin-bottom: 12px;
-        }
-
-        .cart-empty p {
-            color: #707970;
-            margin-bottom: 25px;
-        }
-
-        .empty-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 13px 25px;
-            background: #263126;
-            color: #ffffff;
-            font-weight: 700;
-        }
-
-        .cart-footer {
-            background: #263126;
-            color: #ffffff;
-            padding: 50px 0 25px;
-        }
-
-        .cart-footer-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 50px;
-            padding-bottom: 35px;
-        }
-
-        .cart-footer h3 {
-            font-size: 25px;
-            margin-bottom: 12px;
-        }
-
-        .cart-footer h3 span {
-            color: #9ab19f;
-        }
-
-        .cart-footer h4 {
-            margin-bottom: 15px;
-        }
-
-        .cart-footer p,
-        .cart-footer a {
-            color: #bdc6bd;
-            font-size: 14px;
-        }
-
-        .cart-footer a {
-            display: block;
-            margin-bottom: 9px;
-        }
-
-        .cart-footer a:hover {
-            color: #ffffff;
-        }
-
-        .cart-copyright {
-            border-top: 1px solid #465046;
-            padding-top: 20px;
-            text-align: center;
-            color: #9fa99f;
-            font-size: 12px;
-        }
-
-        @media (max-width: 800px) {
-
-            .cart-box {
-                padding: 15px;
-                overflow-x: auto;
-            }
-
-            .cart-table {
-                min-width: 700px;
-            }
-
-            .cart-footer-content {
-                grid-template-columns: 1fr 1fr;
-            }
-
-        }
-
-        @media (max-width: 600px) {
-
-            .cart-page {
-                padding: 45px 0 60px;
-            }
-
-            .cart-title h1 {
-                font-size: 34px;
-            }
-
-            .cart-footer-content {
-                grid-template-columns: 1fr;
-            }
-
-        }
-
     </style>
-
 </head>
-
 
 <body>
 
+<div class="container">
 
-<!-- HEADER -->
+    <h1>Giỏ hàng</h1>
 
-<header class="header">
+    <div class="cart-box">
 
-    <div class="container header-content">
+        <?php if (empty($_SESSION['cart'])): ?>
 
-        <a
-            href="../index.php"
-            class="logo"
-        >
-            Fashion<span>Shop</span>
-        </a>
-
-
-        <nav class="nav">
-
-            <a href="../index.php">
-                Trang chủ
-            </a>
-
-            <a href="../products/index.php">
-                Sản phẩm
-            </a>
-
-            <a href="../products/index.php?category=1">
-                Áo
-            </a>
-
-            <a href="../products/index.php?category=2">
-                Quần
-            </a>
-
-            <a href="../products/index.php?category=3">
-                Váy
-            </a>
-
-        </nav>
-
-
-        <a
-            href="index.php"
-            class="cart"
-        >
-            Giỏ hàng
-            <span><?= count($cart) ?></span>
-        </a>
-
-    </div>
-
-</header>
-
-
-<!-- CART -->
-
-<section class="cart-page">
-
-    <div class="container">
-
-
-        <div class="cart-title">
-
-            <div class="small-title">
-                YOUR SHOPPING BAG
+            <div class="empty">
+                <p>Giỏ hàng đang trống.</p>
             </div>
-
-            <h1>
-                Giỏ hàng
-            </h1>
-
-            <p>
-                Kiểm tra sản phẩm trước khi thanh toán.
-            </p>
-
-        </div>
-
-
-        <?php if (empty($products)): ?>
-
-
-            <div class="cart-box">
-
-                <div class="cart-empty">
-
-                    <h2>
-                        Giỏ hàng đang trống
-                    </h2>
-
-                    <p>
-                        Bạn chưa có sản phẩm nào trong giỏ hàng.
-                    </p>
-
-                    <a
-                        href="../products/index.php"
-                        class="empty-btn"
-                    >
-                        Xem sản phẩm
-                    </a>
-
-                </div>
-
-            </div>
-
 
         <?php else: ?>
 
+            <form method="POST" action="index.php">
 
-            <div class="cart-box">
-
-                <table class="cart-table">
+                <table>
 
                     <thead>
-
-                        <tr>
-
-                            <th>
-                                Sản phẩm
-                            </th>
-
-                            <th>
-                                Đơn giá
-                            </th>
-
-                            <th>
-                                Số lượng
-                            </th>
-
-                            <th>
-                                Thành tiền
-                            </th>
-
-                        </tr>
-
+                    <tr>
+                        <th>Sản phẩm</th>
+                        <th>Đơn giá</th>
+                        <th>Số lượng</th>
+                        <th>Thành tiền</th>
+                        <th>Thao tác</th>
+                    </tr>
                     </thead>
-
 
                     <tbody>
 
+                    <?php foreach ($_SESSION['cart'] as $item): ?>
 
-                        <?php foreach ($products as $product): ?>
+                        <?php
+                        $subtotal =
+                            $item['price'] * $item['quantity'];
+                        ?>
 
+                        <tr>
 
-                            <?php
+                            <td>
+                                <?= htmlspecialchars($item['name']) ?>
+                            </td>
 
-                            $productId = (int)$product['id'];
+                            <td>
+                                <?= number_format(
+                                    $item['price'],
+                                    0,
+                                    ',',
+                                    '.'
+                                ) ?>
+                                VNĐ
+                            </td>
 
-                            $quantity = (int)(
-                                $cart[$productId]
-                                ?? 0
-                            );
+                            <td>
 
-                            if ($quantity <= 0) {
-                                continue;
-                            }
+                                <div class="quantity">
 
-                            $price = (float)(
-                                $product['price']
-                                ?? 0
-                            );
+                                    <a href="index.php?action=decrease&id=<?= $item['id'] ?>">
+                                        −
+                                    </a>
 
-                            $subtotal =
-                                $price * $quantity;
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        name="quantity[<?= $item['id'] ?>]"
+                                        value="<?= $item['quantity'] ?>"
+                                    >
 
-                            $total += $subtotal;
+                                    <a href="index.php?action=increase&id=<?= $item['id'] ?>">
+                                        +
+                                    </a>
 
+                                </div>
 
-                            $image = trim(
-                                $product['image']
-                                ?? ''
-                            );
+                            </td>
 
-                            if ($image === '') {
-                                $image =
-                                    "../assets/images/ao-thun.jpg";
-                            } else {
+                            <td>
+                                <?= number_format(
+                                    $subtotal,
+                                    0,
+                                    ',',
+                                    '.'
+                                ) ?>
+                                VNĐ
+                            </td>
 
-                                if (
-                                    strpos(
-                                        $image,
-                                        "uploads/"
-                                    ) === 0
-                                ) {
+                            <td>
 
-                                    $image = "../" . $image;
+                                <a
+                                    class="remove"
+                                    href="index.php?action=remove&id=<?= $item['id'] ?>"
+                                    onclick="return confirm('Bạn có chắc muốn xóa sản phẩm này?');"
+                                >
+                                    Xóa
+                                </a>
 
-                                } elseif (
-                                    strpos(
-                                        $image,
-                                        "assets/"
-                                    ) === 0
-                                ) {
+                            </td>
 
-                                    $image = "../" . $image;
+                        </tr>
 
-                                } else {
-
-                                    $image =
-                                        "../uploads/products/"
-                                        . basename($image);
-
-                                }
-                            }
-
-                            ?>
-
-
-                            <tr>
-
-
-                                <td>
-
-                                    <div class="cart-product">
-
-                                        <img
-                                            src="<?= htmlspecialchars($image) ?>"
-                                            alt="<?= htmlspecialchars($product['name']) ?>"
-                                        >
-
-                                        <div>
-
-                                            <div class="cart-product-name">
-
-                                                <?= htmlspecialchars(
-                                                    $product['name']
-                                                ) ?>
-
-                                            </div>
-
-                                        </div>
-
-                                    </div>
-
-                                </td>
-
-
-                                <td class="cart-price">
-
-                                    <?= number_format(
-                                        $price,
-                                        0,
-                                        ',',
-                                        '.'
-                                    ) ?>đ
-
-                                </td>
-
-
-                                <td class="cart-quantity">
-
-                                    <?= $quantity ?>
-
-                                </td>
-
-
-                                <td class="cart-total">
-
-                                    <?= number_format(
-                                        $subtotal,
-                                        0,
-                                        ',',
-                                        '.'
-                                    ) ?>đ
-
-                                </td>
-
-
-                            </tr>
-
-
-                        <?php endforeach; ?>
-
+                    <?php endforeach; ?>
 
                     </tbody>
 
                 </table>
 
+                <div class="bottom">
 
-                <div class="cart-summary">
+                    <button
+                        type="submit"
+                        name="update_cart"
+                        class="button update"
+                    >
+                        Cập nhật giỏ hàng
+                    </button>
 
+                    <div class="total">
+                        Tổng:
+                        <?= number_format(
+                            $total,
+                            0,
 
-                    <div class="cart-grand-total">
+                            ',',
 
-                        Tổng tiền:
+                            '.'
 
-                        <span>
+                        ) ?>
 
-                            <?= number_format(
-                                $total,
-                                0,
-                                ',',
-                                '.'
-                            ) ?>đ
-
-                        </span>
-
-                    </div>
-
-
-                    <div class="cart-actions">
-
-                        <a
-                            href="../products/index.php"
-                            class="cart-btn continue-btn"
-                        >
-                            Tiếp tục mua hàng
-                        </a>
-
-
-                        <a
-                            href="checkout.php"
-                            class="cart-btn checkout-btn"
-                        >
-                            Thanh toán
-                        </a>
+                        VNĐ
 
                     </div>
 
+                    <a
+
+                        href="checkout.php"
+
+                        class="button checkout"
+
+                    >
+
+                        Thanh toán
+
+                    </a>
 
                 </div>
 
-
-            </div>
-
+            </form>
 
         <?php endif; ?>
 
-
     </div>
 
-</section>
-
-
-<!-- FOOTER -->
-
-<footer class="cart-footer">
-
-    <div class="container">
-
-
-        <div class="cart-footer-content">
-
-
-            <div>
-
-                <h3>
-                    Fashion<span>Shop</span>
-                </h3>
-
-                <p>
-                    Thời trang trẻ trung,
-                    hiện đại và phù hợp
-                    với phong cách riêng
-                    của bạn.
-                </p>
-
-            </div>
-
-
-            <div>
-
-                <h4>
-                    Danh mục
-                </h4>
-
-                <a href="../products/index.php">
-                    Tất cả sản phẩm
-                </a>
-
-                <a href="../products/index.php?category=1">
-                    Áo
-                </a>
-
-                <a href="../products/index.php?category=2">
-                    Quần
-                </a>
-
-                <a href="../products/index.php?category=3">
-                    Váy
-                </a>
-
-            </div>
-
-
-            <div>
-
-                <h4>
-                    Hỗ trợ
-                </h4>
-
-                <a href="#">
-                    Chính sách đổi trả
-                </a>
-
-                <a href="#">
-                    Vận chuyển
-                </a>
-
-                <a href="#">
-                    Liên hệ
-                </a>
-
-            </div>
-
-
-        </div>
-
-
-        <div class="cart-copyright">
-
-            © 2026 Fashion Shop
-
-        </div>
-
-
-    </div>
-
-</footer>
-
+</div>
 
 </body>
 
