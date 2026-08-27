@@ -59,35 +59,42 @@ try {
 
 function getProductImage($image)
 {
-    $image = trim($image ?? '');
+    $image = trim((string)($image ?? ''));
 
-    /* Nếu database không có ảnh */
+    // Không có ảnh
     if ($image === '') {
-        return "../uploads/products/ao-thun.jpg";
+        return '../assets/images/ao-thun.jpg';
     }
 
-    /* Chuẩn hóa dấu */
-    $image = str_replace("\\", "/", $image);
+    // Chuẩn hóa đường dẫn
+    $image = str_replace('\\', '/', $image);
+    $image = ltrim($image, '/');
 
-    /* Lấy tên file */
+    // DB lưu nguyên đường dẫn:
+    // assets/images/abc.jpg
+    // uploads/products/abc.jpg
+    $fullPath = __DIR__ . '/../' . $image;
+
+    if (file_exists($fullPath)) {
+        return '../' . $image;
+    }
+
+    // Trường hợp DB chỉ lưu tên file
     $filename = basename($image);
 
-    /* Đường dẫn thật trên máy */
-    $fullPath = __DIR__
-        . "/../uploads/products/"
-        . $filename;
-
-    /* Nếu ảnh tồn tại */
-    if (file_exists($fullPath)) {
-
-        return "../uploads/products/" . $filename;
-
+    // Tìm trong uploads/products
+    if (file_exists(__DIR__ . '/../uploads/products/' . $filename)) {
+        return '../uploads/products/' . $filename;
     }
 
-    /* Nếu không tìm thấy ảnh */
-    return "../uploads/products/ao-thun.jpg";
-}
+    // Tìm trong assets/images
+    if (file_exists(__DIR__ . '/../assets/images/' . $filename)) {
+        return '../assets/images/' . $filename;
+    }
 
+    // Ảnh mặc định
+    return '../assets/images/ao-thun.jpg';
+}
 ?>
 
 <!DOCTYPE html>
