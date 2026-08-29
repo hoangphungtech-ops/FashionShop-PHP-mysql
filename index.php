@@ -105,7 +105,7 @@ function getProductImage($image)
 </head>
 
 
-<body>
+<body class="home-page">
 
 
 <!-- =========================
@@ -218,8 +218,8 @@ function getProductImage($image)
         <div class="hero-image">
 
             <img
-                src="assets/images/ao-so-mi-nu - Copy.jpg"
-                alt="Fashion Shop"
+                src="assets/images/vay-nu-thanh-lich.jpg"
+                alt="Váy nữ thanh lịch Fashion Shop"
             >
 
         </div>
