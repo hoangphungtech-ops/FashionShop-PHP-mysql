@@ -120,14 +120,27 @@ function getProductImage($image)
         <a href="index.php"
            class="logo">
 
-            Fashion<span>Shop</span>
+            <span class="logo-fashion">Fashion</span><span class="logo-shop">Shop</span>
 
         </a>
 
 
-        <nav class="nav">
+        <button
+            class="menu-toggle"
+            type="button"
+            aria-label="Mở menu"
+            aria-controls="primary-navigation"
+            aria-expanded="false"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
 
-            <a href="index.php">
+
+        <nav class="nav" id="primary-navigation" aria-label="Điều hướng chính">
+
+            <a href="index.php" class="active" aria-current="page">
                 Trang chủ
             </a>
 
@@ -150,14 +163,37 @@ function getProductImage($image)
         </nav>
 
 
-        <a href="cart/index.php"
-           class="cart">
+        <div class="header-actions">
 
-            Giỏ hàng
+            <a href="auth/profile.php"
+               class="header-action account-link">
 
-            <span>0</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4"></circle>
+                    <path d="M4 21a8 8 0 0 1 16 0"></path>
+                </svg>
 
-        </a>
+                <span class="action-label">Tài khoản</span>
+
+            </a>
+
+
+            <a href="cart/index.php"
+               class="header-action cart">
+
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 8h12l1 13H5L6 8Z"></path>
+                    <path d="M9 9V6a3 3 0 0 1 6 0v3"></path>
+                </svg>
+
+                <span class="action-label">Giỏ hàng</span>
+
+                <span class="cart-count" aria-label="0 sản phẩm">0</span>
+
+            </a>
+
+        </div>
+
 
     </div>
 
@@ -580,6 +616,9 @@ function getProductImage($image)
     </div>
 
 </footer>
+
+
+<script src="assets/js/main.js" defer></script>
 
 
 </body>
