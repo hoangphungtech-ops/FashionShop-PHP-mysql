@@ -1,5 +1,19 @@
 # Database config cá nhân
 config/database.php
+config/*.local.php
+
+# Secrets / environment
+.env
+.env.*
+!.env.example
+
+# Runtime logs and cache
+*.log
+storage/logs/*
+!storage/logs/.gitkeep
+storage/cache/*
+!storage/cache/.gitkeep
+.phpunit.result.cache
 
 # IDE
 .vscode/
@@ -12,3 +26,6 @@ Thumbs.db
 # File upload thực tế
 uploads/products/*
 !uploads/products/.gitkeep
+
+# Local dependencies (project currently has no Composer dependency)
+vendor/

@@ -1,30 +1,22 @@
 <?php
 
-$host = "localhost";
-$dbname = "fashion_shop";
-$username = "root";
-$password = "";
+declare(strict_types=1);
 
-try {
+// Legacy PDO adapter. Credentials live only in config/database.php.
+$configPath = dirname(__DIR__) . '/config/database.php';
 
-    $pdo = new PDO(
-        "mysql:host=$host;dbname=$dbname;charset=utf8mb4",
-        $username,
-        $password
+if (!is_file($configPath)) {
+    require_once __DIR__ . '/bootstrap.php';
+
+    throw new RuntimeException(
+        'Thiếu config/database.php. Hãy sao chép config/database.example.php và cấu hình database.'
     );
+}
 
-    $pdo->setAttribute(
-        PDO::ATTR_ERRMODE,
-        PDO::ERRMODE_EXCEPTION
-    );
+$databaseConnectionMode = 'pdo';
+require $configPath;
+unset($databaseConnectionMode);
 
-    $pdo->setAttribute(
-        PDO::ATTR_DEFAULT_FETCH_MODE,
-        PDO::FETCH_ASSOC
-    );
-
-} catch (PDOException $e) {
-
-    die("Kết nối database thất bại: " . $e->getMessage());
-
+if (!isset($pdo) || !$pdo instanceof PDO) {
+    throw new RuntimeException('Không thể khởi tạo kết nối PDO.');
 }
