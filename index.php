@@ -10,11 +10,9 @@ $products = [];
 
 try {
 
-    $sql = "SELECT products.*, categories.name AS category_name
-            FROM products
-            LEFT JOIN categories ON categories.id = products.category_id
-            WHERE products.status = 1
-            ORDER BY products.id DESC
+    $sql = "SELECT * FROM products
+            WHERE status = 1
+            ORDER BY id DESC
             LIMIT 6";
 
     $stmt = $pdo->query($sql);
@@ -102,7 +100,7 @@ function getProductImage($image)
     <title>Fashion Shop</title>
 
     <link rel="stylesheet"
-          href="assets/css/style.css">
+          href="assets/css/style.css?v=20260831-7">
 
 </head>
 
@@ -122,40 +120,19 @@ function getProductImage($image)
         <a href="index.php"
            class="logo">
 
-            <span class="logo-fashion">Fashion</span><span class="logo-shop">Shop</span>
+            Fashion<span>Shop</span>
 
         </a>
 
 
-        <button
-            class="menu-toggle"
-            type="button"
-            aria-label="Mở menu"
-            aria-controls="primary-navigation"
-            aria-expanded="false"
-        >
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
+        <nav class="nav">
 
-
-        <nav class="nav" id="primary-navigation" aria-label="Điều hướng chính">
-
-            <a href="index.php" class="active" aria-current="page">
+            <a href="index.php">
                 Trang chủ
             </a>
 
             <a href="products/index.php">
                 Sản phẩm
-            </a>
-
-            <a href="products/index.php?gender=nam">
-                Nam
-            </a>
-
-            <a href="products/index.php?gender=nu">
-                Nữ
             </a>
 
             <a href="products/index.php?category=1">
@@ -173,37 +150,14 @@ function getProductImage($image)
         </nav>
 
 
-        <div class="header-actions">
+        <a href="cart/index.php"
+           class="cart">
 
-            <a href="auth/profile.php"
-               class="header-action account-link">
+            Giỏ hàng
 
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="12" cy="8" r="4"></circle>
-                    <path d="M4 21a8 8 0 0 1 16 0"></path>
-                </svg>
+            <span>0</span>
 
-                <span class="action-label">Tài khoản</span>
-
-            </a>
-
-
-            <a href="cart/index.php"
-               class="header-action cart">
-
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6 8h12l1 13H5L6 8Z"></path>
-                    <path d="M9 9V6a3 3 0 0 1 6 0v3"></path>
-                </svg>
-
-                <span class="action-label">Giỏ hàng</span>
-
-                <span class="cart-count" aria-label="0 sản phẩm">0</span>
-
-            </a>
-
-        </div>
-
+        </a>
 
     </div>
 
@@ -257,20 +211,46 @@ function getProductImage($image)
 
             </a>
 
-        </div>
-
-
-
-        <div class="hero-image">
-
-            <img
-                src="assets/images/hero-fashion-nu-new.png"
-                alt="Người mẫu nữ trong thiết kế thanh lịch của Fashion Shop"
-            >
+            <div class="hero-meta" aria-label="Thông tin bộ sưu tập">
+                <span>✦ NEW COLLECTION</span>
+                <span>MEN &amp; WOMEN</span>
+                <span>MODERN / ELEGANT</span>
+            </div>
 
         </div>
 
 
+
+<div class="hero-duo">
+
+    <div class="hero-duo-card hero-duo-card--male">
+        <img
+            src="assets/images/namthanhlich.png"
+            alt="Thời trang nam thanh lịch"
+        >
+
+        <span class="hero-duo-label">
+            MEN / TAILORED
+        </span>
+    </div>
+
+    <div class="hero-duo-card hero-duo-card--female">
+        <img
+            src="assets/images/hero-fashion-nu-new.png"
+            alt="Thời trang nữ hiện đại"
+        >
+
+        <span class="hero-duo-label">
+            WOMEN / NEW EDIT
+        </span>
+    </div>
+
+    <div class="hero-duo-badge">
+        <strong>FS</strong>
+        <span>EDIT · 2026</span>
+    </div>
+
+</div>
     </div>
 
 </section>
@@ -330,12 +310,6 @@ function getProductImage($image)
                         $product['image'] ?? ''
                     );
 
-                    $productName = (string)($product['name'] ?? 'Sản phẩm');
-                    $productGender = preg_match('/(^|\s)nữ($|\s)/iu', $productName)
-                        ? 'NỮ'
-                        : (preg_match('/(^|\s)nam($|\s)/iu', $productName) ? 'NAM' : 'UNISEX');
-                    $productCategory = (string)($product['category_name'] ?? 'THỜI TRANG');
-
                     ?>
 
 
@@ -365,7 +339,7 @@ function getProductImage($image)
 
 
                             <small>
-                                <?= htmlspecialchars($productGender . ' · ' . $productCategory) ?>
+                                FASHION
                             </small>
 
 
@@ -634,10 +608,6 @@ function getProductImage($image)
 </footer>
 
 
-<script src="assets/js/main.js" defer></script>
-
-
 </body>
 
 </html>
-
