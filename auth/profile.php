@@ -1,124 +1,170 @@
 <?php
-require_once 'db.php';
-require_login(); // Kiểm tra đăng nhập
+session_start();
+require_once __DIR__ . "/../includes/db.php";
 
-$user_id = $_SESSION['user']['id'];
-$msg = '';
-
-// Xử lý cập nhật thông tin
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = trim($_POST['full_name'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $new_password = $_POST['new_password'] ?? '';
-
-    if (!empty($full_name)) {
-        if (!empty($new_password)) {
-            if (strlen($new_password) < 6) {
-                $msg = '<div class="msg error">Mật khẩu mới phải từ 6 ký tự trở lên!</div>';
-            } else {
-                $hashed = password_hash($new_password, PASSWORD_BCRYPT);
-                $stmt = $pdo->prepare("UPDATE users SET full_name = ?, phone = ?, password = ? WHERE id = ?");
-                $stmt->execute([$full_name, $phone, $hashed, $user_id]);
-                $msg = '<div class="msg success">Cập nhật thông tin và mật khẩu thành công!</div>';
-            }
-        } else {
-            $stmt = $pdo->prepare("UPDATE users SET full_name = ?, phone = ? WHERE id = ?");
-            $stmt->execute([$full_name, $phone, $user_id]);
-            $msg = '<div class="msg success">Cập nhật thông tin thành công!</div>';
-        }
-        
-        // Cập nhật lại session
-        $_SESSION['user']['full_name'] = $full_name;
-        $_SESSION['user']['phone'] = $phone;
-    }
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login-register.php");
+    exit();
 }
 
-// Lấy thông tin mới nhất từ database
+$user_id = $_SESSION['user_id'];
+$message = '';
+
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
-$currentUser = $stmt->fetch();
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $phone = trim($_POST['phone']);
+    $address = trim($_POST['address']);
+    
+    $old_password = $_POST['old_password'];
+    $new_password = $_POST['new_password'];
+    $confirm_password = $_POST['confirm_password'];
+
+    $update_query = "UPDATE users SET phone = ?, address = ?";
+    $params = [$phone, $address];
+    $has_error = false;
+
+    if (!empty($old_password) || !empty($new_password) || !empty($confirm_password)) {
+        
+        if (empty($old_password) || empty($new_password) || empty($confirm_password)) {
+            $message = "<div class='alert alert-danger'>Vui lòng nhập đầy đủ thông tin để đổi mật khẩu!</div>";
+            $has_error = true;
+        } else {
+            if (password_verify($old_password, $user['password'])) {
+                if ($new_password === $confirm_password) {
+                    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                    $update_query .= ", password = ?";
+                    $params[] = $hashed_password;
+                } else {
+                    $message = "<div class='alert alert-danger'>Mật khẩu mới không khớp!</div>";
+                    $has_error = true;
+                }
+            } else {
+                $message = "<div class='alert alert-danger'>Mật khẩu hiện tại không chính xác!</div>";
+                $has_error = true;
+            }
+        }
+    }
+
+    if (!$has_error) {
+        $update_query .= " WHERE id = ?";
+        $params[] = $user_id;
+
+        $stmt = $pdo->prepare($update_query);
+        if ($stmt->execute($params)) {
+            $message = "<div class='alert alert-success'>Cập nhật thông tin thành công!</div>";
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+            $stmt->execute([$user_id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        } else {
+            $message = "<div class='alert alert-danger'>Có lỗi xảy ra khi cập nhật.</div>";
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hồ sơ cá nhân</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; color: #fff; text-transform: uppercase; }
-        .badge-admin { background: #dc3545; }
-        .badge-staff { background: #ffc107; color: #000; }
-        .badge-customer { background: #17a2b8; }
-        .form-group { margin-bottom: 12px; }
-        label { display: block; font-weight: bold; margin-bottom: 4px; }
-        input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { padding: 10px 18px; background: #007bff; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .logout-btn { float: right; background: #6c757d; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 13px; }
-        .msg { padding: 10px; border-radius: 4px; margin-bottom: 15px; }
-        .error { background: #f8d7da; color: #721c24; }
-        .success { background: #d4edda; color: #155724; }
-        .role-section { margin-top: 25px; padding-top: 15px; border-top: 2px dashed #ddd; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-<div class="container">
-    <a href="logout.php" class="logout-btn">Đăng xuất</a>
-    <h2>Hồ Sơ Cá Nhân</h2>
-    
-    <p>
-        <strong>Vai trò:</strong> 
-        <span class="badge badge-<?= htmlspecialchars($currentUser['role']) ?>">
-            <?= htmlspecialchars($currentUser['role']) ?>
-        </span>
-    </p>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2>Xin chào, <?= htmlspecialchars($user['name']) ?>!</h2>
+                    <a href="logout.php" class="btn btn-danger">Đăng xuất</a>
+                </div>
 
-    <?= $msg ?>
+                <?= $message ?>
 
-    <form method="POST" action="profile.php">
-        <div class="form-group">
-            <label>Email (Không thể thay đổi):</label>
-            <input type="email" value="<?= htmlspecialchars($currentUser['email']) ?>" disabled>
-        </div>
-        <div class="form-group">
-            <label>Họ và tên:</label>
-            <input type="text" name="full_name" value="<?= htmlspecialchars($currentUser['full_name']) ?>" required>
-        </div>
-        <div class="form-group">
-            <label>Số điện thoại:</label>
-            <input type="text" name="phone" value="<?= htmlspecialchars($currentUser['phone'] ?? '') ?>">
-        </div>
-        <div class="form-group">
-            <label>Đổi mật khẩu mới (để trống nếu không đổi):</label>
-            <input type="password" name="new_password" placeholder="Nhập mật khẩu mới...">
-        </div>
-        <button type="submit">Lưu thông tin</button>
-    </form>
+                <div class="card shadow-sm">
+                    <div class="card-body p-4">
+                        <h4 class="mb-4">Thông tin tài khoản</h4>
+                        
+                        <div class="mb-4">
+                            <p><strong>Email:</strong> <?= htmlspecialchars($user['email']) ?></p>
+                            <p><strong>Vai trò:</strong> <?= htmlspecialchars(strtoupper($user['role'])) ?></p>
+                            <p><strong>Ngày tham gia:</strong> <?= date('d/m/Y H:i', strtotime($user['created_at'])) ?></p>
+                        </div>
 
-    <!-- Khu vực hiển thị riêng biệt theo phân quyền -->
-    <div class="role-section">
-        <h3>Chức năng theo quyền của bạn:</h3>
-        <?php if ($currentUser['role'] === 'admin'): ?>
-            <p style="color: #dc3545; font-weight: bold;">[Khu vực Admin] Toàn quyền quản lý:</p>
-            <ul>
-                <li>Xem báo cáo doanh thu cửa hàng</li>
-                <li>Quản lý danh sách tài khoản & Phân quyền user</li>
-                <li>Xóa & Khóa tài khoản khách hàng / nhân viên</li>
-            </ul>
-        <?php elseif ($currentUser['role'] === 'staff'): ?>
-            <p style="color: #d39e00; font-weight: bold;">[Khu vực Nhân viên]:</p>
-            <ul>
-                <li>Quản lý sản phẩm thời trang & Tồn kho</li>
-                <li>Xác nhận đơn hàng và giao hàng</li>
-            </ul>
-        <?php else: ?>
-            <p style="color: #17a2b8; font-weight: bold;">[Khu vực Khách hàng]:</p>
-            <ul>
-                <li>Xem lịch sử đặt hàng thời trang</li>
-                <li>Quản lý sổ địa chỉ nhận hàng</li>
-            </ul>
-        <?php endif; ?>
+                        <hr>
+                        <h5 class="mb-3">Cập nhật thông tin</h5>
+                        
+                        <form method="POST" action="" onsubmit="return validateProfilePassword()">
+                            <div class="mb-3">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone'] ?? '') ?>">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Địa chỉ</label>
+                                <input type="text" name="address" class="form-control" value="<?= htmlspecialchars($user['address'] ?? '') ?>">
+                            </div>
+                            
+                            <div class="alert alert-secondary mt-4">
+                                <h6>Đổi mật khẩu (Bỏ trống nếu không muốn đổi)</h6>
+                                
+                                <div class="mb-3 mt-3">
+                                    <label class="form-label">Mật khẩu hiện tại</label>
+                                    <input type="password" id="old-password" name="old_password" class="form-control">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Mật khẩu mới</label>
+                                    <input type="password" id="new-password" name="new_password" class="form-control">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Xác nhận mật khẩu mới</label>
+                                    <input type="password" id="confirm-password" name="confirm_password" class="form-control">
+                                    <div id="profile-password-error" class="text-danger mt-1" style="display:none; font-size:0.875em;">Mật khẩu mới không khớp!</div>
+                                    <div id="profile-empty-error" class="text-danger mt-1" style="display:none; font-size:0.875em;">Vui lòng điền đủ 3 ô nếu muốn đổi mật khẩu!</div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">Lưu thay đổi</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+
+    <script>
+        function validateProfilePassword() {
+            const oldPass = document.getElementById('old-password').value;
+            const newPass = document.getElementById('new-password').value;
+            const confirmPass = document.getElementById('confirm-password').value;
+            
+            const matchError = document.getElementById('profile-password-error');
+            const emptyError = document.getElementById('profile-empty-error');
+            
+            // Reset hiển thị lỗi
+            matchError.style.display = 'none';
+            emptyError.style.display = 'none';
+            
+            // Kiểm tra xem người dùng có đang cố gắng đổi mật khẩu không
+            if (oldPass !== '' || newPass !== '' || confirmPass !== '') {
+                // Kiểm tra xem có bỏ trống ô nào không
+                if (oldPass === '' || newPass === '' || confirmPass === '') {
+                    emptyError.style.display = 'block';
+                    return false; // Ngăn submit form
+                }
+                
+                // Kiểm tra 2 ô mật khẩu mới có khớp không
+                if (newPass !== confirmPass) {
+                    matchError.style.display = 'block';
+                    return false; // Ngăn submit form
+                }
+            }
+            
+            return true; // Cho phép submit form
+        }
+    </script>
 </body>
 </html>
