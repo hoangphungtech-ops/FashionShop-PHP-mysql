@@ -2,51 +2,35 @@
 
 require_once __DIR__ . "/../includes/db.php";
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 
 /* =========================
    KIỂM TRA ID
 ========================= */
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+$id = isset($_GET['id'])
+    ? (int)$_GET['id']
+    : 0;
+
+if ($id <= 0) {
     die("Sản phẩm không hợp lệ.");
 }
-
-$id = (int) $_GET['id'];
 
 
 /* =========================
    LẤY SẢN PHẨM
 ========================= */
 
-try {
+$stmt = $pdo->prepare("
+    SELECT *
+    FROM products
+    WHERE id = ?
+      AND status = 1
+    LIMIT 1
+");
 
-    $sql = "SELECT products.*,
-                   categories.name AS category_name
-            FROM products
-            LEFT JOIN categories
-                ON products.category_id = categories.id
-            WHERE products.id = :id
-            AND products.status = 1
-            LIMIT 1";
+$stmt->execute([$id]);
 
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':id' => $id
-    ]);
-
-    $product = $stmt->fetch(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-
-    die("Lỗi database: " . $e->getMessage());
-
-}
-
+$product = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$product) {
     die("Không tìm thấy sản phẩm.");
@@ -54,121 +38,207 @@ if (!$product) {
 
 
 /* =========================
-   XỬ LÝ 1 ẢNH SẢN PHẨM
+   LẤY ẢNH PHỤ
 ========================= */
 
-function getProductImage($image)
-{
-    $image = trim($image ?? '');
+$extraImages = [];
 
-    if ($image === '') {
-        return "../assets/images/ao-thun.jpg";
-    }
+try {
 
+    $imageStmt = $pdo->prepare("
+        SELECT id, product_id, image
+        FROM product_images
+        WHERE product_id = ?
+        ORDER BY id ASC
+    ");
 
-    /* Nếu là URL */
+    $imageStmt->execute([$id]);
 
-    if (filter_var($image, FILTER_VALIDATE_URL)) {
-        return $image;
-    }
+    $extraImages = $imageStmt->fetchAll(PDO::FETCH_ASSOC);
 
+} catch (PDOException $e) {
 
-    /* Chuẩn hóa đường dẫn */
+    // Nếu bảng product_images có vấn đề
+    // vẫn cho trang sản phẩm chạy bằng ảnh chính
+    $extraImages = [];
 
-    $image = str_replace("\\", "/", $image);
-
-    $projectRoot = dirname(__DIR__);
-
-
-    /* =========================
-       DATABASE LƯU uploads/...
-    ========================= */
-
-    if (strpos($image, "uploads/") === 0) {
-
-        $fullPath = $projectRoot . "/" . $image;
-
-        if (file_exists($fullPath)) {
-
-            return "../" . $image;
-
-        }
-    }
-
-
-    /* =========================
-       DATABASE LƯU assets/...
-    ========================= */
-
-    if (strpos($image, "assets/") === 0) {
-
-        $fullPath = $projectRoot . "/" . $image;
-
-        if (file_exists($fullPath)) {
-
-            return "../" . $image;
-
-        }
-    }
-
-
-    /* =========================
-       CHỈ LƯU TÊN FILE
-    ========================= */
-
-    $filename = basename($image);
-
-
-    $folders = [
-
-        "uploads/products/",
-        "uploads/",
-        "assets/images/products/",
-        "assets/images/",
-        "assets/img/products/",
-        "assets/img/",
-        "images/products/",
-        "images/"
-
-    ];
-
-
-    foreach ($folders as $folder) {
-
-        $fullPath =
-            $projectRoot .
-            "/" .
-            $folder .
-            $filename;
-
-        if (file_exists($fullPath)) {
-
-            return "../" .
-                   $folder .
-                   $filename;
-
-        }
-    }
-
-
-    /* =========================
-       ẢNH MẶC ĐỊNH
-    ========================= */
-
-    return "../assets/images/ao-thun.jpg";
 }
 
 
 /* =========================
-   LẤY ẢNH
+   XỬ LÝ ĐƯỜNG DẪN ẢNH
 ========================= */
 
-$productImage = getProductImage(
+function detailImage($image)
+{
+    $image = trim((string)$image);
+
+    /*
+     * Không có ảnh
+     */
+    if ($image === '') {
+        return '../assets/images/no-image.jpg';
+    }
+
+
+    /*
+     * Nếu là URL đầy đủ
+     */
+    if (
+        strpos($image, 'http://') === 0 ||
+        strpos($image, 'https://') === 0
+    ) {
+        return $image;
+    }
+
+
+    /*
+     * Chuẩn hóa dấu \
+     */
+    $image = str_replace('\\', '/', $image);
+
+
+    /*
+     * Nếu database đã lưu đường dẫn
+     * assets/images/xxx.jpg
+     */
+    if (strpos($image, 'assets/images/') === 0) {
+
+        $file = __DIR__ . '/../' . $image;
+
+        if (file_exists($file)) {
+            return '../' . $image;
+        }
+    }
+
+
+    /*
+     * Nếu database lưu
+     * uploads/products/xxx.jpg
+     */
+    if (strpos($image, 'uploads/products/') === 0) {
+
+        $file = __DIR__ . '/../' . $image;
+
+        if (file_exists($file)) {
+            return '../' . $image;
+        }
+    }
+
+
+    /*
+     * Nếu database lưu ./uploads/products/xxx.jpg
+     */
+    if (strpos($image, './') === 0) {
+
+        $cleanImage = substr($image, 2);
+
+        $file = __DIR__ . '/../' . $cleanImage;
+
+        if (file_exists($file)) {
+            return '../' . $cleanImage;
+        }
+    }
+
+
+    /*
+     * Nếu chỉ lưu tên file
+     * Ví dụ:
+     * ao-thun.jpg
+     */
+
+    $uploadFile = __DIR__ . '/../uploads/products/' . $image;
+
+    if (file_exists($uploadFile)) {
+        return '../uploads/products/' . $image;
+    }
+
+
+    /*
+     * Thử assets/images
+     */
+
+    $assetFile = __DIR__ . '/../assets/images/' . $image;
+
+    if (file_exists($assetFile)) {
+        return '../assets/images/' . $image;
+    }
+
+
+    /*
+     * Thử đường dẫn trong thư mục products
+     */
+
+    $productFile = __DIR__ . '/' . $image;
+
+    if (file_exists($productFile)) {
+        return $image;
+    }
+
+
+    /*
+     * Không tìm thấy ảnh
+     */
+
+    return '../assets/images/no-image.jpg';
+}
+
+
+/* =========================
+   ẢNH CHÍNH
+========================= */
+
+$mainImage = detailImage(
     $product['image'] ?? ''
 );
 
-?>
 
+/* =========================
+   DANH SÁCH ẢNH
+========================= */
+
+$allImages = [];
+
+
+/*
+ * Thêm ảnh chính
+ */
+
+if (!empty($product['image'])) {
+
+    $allImages[] = [
+        'image' => $product['image']
+    ];
+}
+
+
+/*
+ * Thêm ảnh phụ
+ */
+
+foreach ($extraImages as $img) {
+
+    if (!empty($img['image'])) {
+
+        $allImages[] = [
+            'image' => $img['image']
+        ];
+    }
+}
+
+
+/*
+ * Nếu không có ảnh nào
+ */
+
+if (empty($allImages)) {
+
+    $allImages[] = [
+        'image' => ''
+    ];
+}
+
+?>
 
 <!DOCTYPE html>
 
@@ -184,12 +254,9 @@ $productImage = getProductImage(
     >
 
     <title>
-        <?= htmlspecialchars(
-            $product['name'] ?? 'Chi tiết sản phẩm'
-        ) ?>
+        <?= htmlspecialchars($product['name']) ?>
         - Fashion Shop
     </title>
-
 
     <link
         rel="stylesheet"
@@ -205,46 +272,83 @@ $productImage = getProductImage(
 
         .detail-page {
 
-            padding: 70px 0 90px;
+            padding: 70px 0;
 
-            background: #f8fbf7;
-
-            min-height: 600px;
-
+            background: #f7faf7;
         }
 
 
-        .detail-container {
-
-            width: 90%;
-
-            max-width: 1100px;
-
-            margin: 0 auto;
+        .detail-layout {
 
             display: grid;
 
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns:
+                1.05fr .95fr;
 
-            gap: 55px;
+            gap: 70px;
 
-            padding: 35px;
-
-            background: #ffffff;
-
-            border: 1px solid #e4ebe4;
-
+            align-items: start;
         }
 
 
         /* =========================
-           IMAGE
+           ẢNH
         ========================= */
 
         .detail-gallery {
 
+            display: grid;
+
+            grid-template-columns:
+                85px 1fr;
+
+            gap: 15px;
+        }
+
+
+        .detail-thumbnails {
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 12px;
+        }
+
+
+        .detail-thumb {
+
+            width: 85px;
+
+            height: 105px;
+
+            border: 1px solid #dfe7e1;
+
+            background: #fff;
+
+            padding: 0;
+
+            cursor: pointer;
+
+            overflow: hidden;
+        }
+
+
+        .detail-thumb.active {
+
+            border: 2px solid #173d32;
+        }
+
+
+        .detail-thumb img {
+
             width: 100%;
 
+            height: 100%;
+
+            object-fit: cover;
+
+            display: block;
         }
 
 
@@ -252,18 +356,11 @@ $productImage = getProductImage(
 
             width: 100%;
 
-            height: 520px;
+            height: 600px;
+
+            background: #eef3ef;
 
             overflow: hidden;
-
-            background: #f1f4f1;
-
-            display: flex;
-
-            align-items: center;
-
-            justify-content: center;
-
         }
 
 
@@ -275,132 +372,87 @@ $productImage = getProductImage(
 
             object-fit: cover;
 
-            transition: 0.4s ease;
-
-        }
-
-
-        .detail-main-image img:hover {
-
-            transform: scale(1.03);
-
+            display: block;
         }
 
 
         /* =========================
-           INFO
+           THÔNG TIN
         ========================= */
 
         .detail-info {
 
-            padding: 20px 5px;
-
-            display: flex;
-
-            flex-direction: column;
-
-            justify-content: center;
-
+            padding-top: 10px;
         }
 
 
         .detail-category {
 
-            margin-bottom: 14px;
+            color: #71937d;
 
-            color: #78917d;
-
-            font-size: 12px;
+            font-size: 11px;
 
             font-weight: 700;
 
             letter-spacing: 3px;
 
-            text-transform: uppercase;
-
+            margin-bottom: 15px;
         }
 
 
         .detail-info h1 {
 
-            margin-bottom: 18px;
-
-            color: #263126;
+            color: #173d32;
 
             font-size: 42px;
 
-            line-height: 1.15;
+            line-height: 1.1;
 
+            margin-bottom: 18px;
         }
 
 
         .detail-price {
 
-            margin-bottom: 25px;
+            color: #638b72;
 
-            color: #78917d;
-
-            font-size: 26px;
+            font-size: 28px;
 
             font-weight: 700;
 
+            margin-bottom: 25px;
         }
 
 
         .detail-description {
 
+            color: #66766e;
+
+            font-size: 16px;
+
+            line-height: 1.9;
+
             margin-bottom: 25px;
-
-            color: #687168;
-
-            font-size: 15px;
-
-            line-height: 1.8;
-
         }
 
 
         .detail-stock {
 
-            margin-bottom: 30px;
+            padding: 15px 18px;
 
-            padding: 14px 16px;
+            background: #eef4ef;
 
-            background: #f3f7f3;
+            margin-bottom: 25px;
 
-            color: #667066;
+            color: #173d32;
 
             font-size: 14px;
 
+            font-weight: 600;
         }
 
 
-        .detail-stock strong {
-
-            color: #263126;
-
-        }
-
-
-        /* =========================
-           BUTTON
-        ========================= */
-
-        .detail-buttons {
-
-            display: flex;
-
-            align-items: center;
-
-            gap: 12px;
-
-            flex-wrap: wrap;
-
-        }
-
-
-        .back-btn,
-        .cart-btn {
+        .back-products {
 
             display: inline-flex;
 
@@ -408,247 +460,87 @@ $productImage = getProductImage(
 
             justify-content: center;
 
-            min-height: 48px;
+            padding: 15px 24px;
 
-            padding: 0 22px;
+            background: #173d32;
 
-            font-size: 14px;
+            color: #fff;
 
             font-weight: 700;
 
-            transition: 0.3s ease;
-
+            transition: .2s;
         }
 
 
-        .back-btn {
+        .back-products:hover {
 
-            border: 1px solid #78917d;
-
-            background: #ffffff;
-
-            color: #78917d;
-
-        }
-
-
-        .back-btn:hover {
-
-            background: #edf4ee;
-
-        }
-
-
-        .cart-btn {
-
-            border: 1px solid #263126;
-
-            background: #263126;
-
-            color: #ffffff;
-
-        }
-
-
-        .cart-btn:hover {
-
-            border-color: #78917d;
-
-            background: #78917d;
-
+            background: #285746;
         }
 
 
         /* =========================
-           FOOTER
+           MOBILE
         ========================= */
 
-        .detail-footer {
+        @media (max-width: 700px) {
 
-            padding: 55px 0 25px;
+            .detail-page {
 
-            background: #263126;
-
-            color: #ffffff;
-
-        }
+                padding: 35px 0;
+            }
 
 
-        .detail-footer-content {
-
-            display: grid;
-
-            grid-template-columns: 2fr 1fr 1fr;
-
-            gap: 50px;
-
-            padding-bottom: 35px;
-
-        }
-
-
-        .detail-footer h3 {
-
-            margin-bottom: 12px;
-
-            font-size: 25px;
-
-        }
-
-
-        .detail-footer h3 span {
-
-            color: #9ab19f;
-
-        }
-
-
-        .detail-footer h4 {
-
-            margin-bottom: 15px;
-
-        }
-
-
-        .detail-footer p {
-
-            max-width: 350px;
-
-            color: #bdc6bd;
-
-            font-size: 14px;
-
-            line-height: 1.7;
-
-        }
-
-
-        .detail-footer a {
-
-            display: block;
-
-            margin-bottom: 9px;
-
-            color: #bdc6bd;
-
-            font-size: 14px;
-
-        }
-
-
-        .detail-footer a:hover {
-
-            color: #ffffff;
-
-        }
-
-
-        .detail-copyright {
-
-            padding-top: 20px;
-
-            border-top: 1px solid #465046;
-
-            text-align: center;
-
-            color: #9fa99f;
-
-            font-size: 12px;
-
-        }
-
-
-        /* =========================
-           RESPONSIVE
-        ========================= */
-
-        @media (max-width: 850px) {
-
-            .detail-container {
+            .detail-layout {
 
                 grid-template-columns: 1fr;
 
                 gap: 35px;
+            }
 
+
+            .detail-gallery {
+
+                grid-template-columns: 1fr;
+
+                gap: 12px;
             }
 
 
             .detail-main-image {
 
-                height: 500px;
-
+                height: 430px;
             }
 
 
-            .detail-footer-content {
+            .detail-thumbnails {
 
-                grid-template-columns: 1fr 1fr;
+                flex-direction: row;
 
-            }
+                overflow-x: auto;
 
-        }
-
-
-        @media (max-width: 600px) {
-
-            .detail-page {
-
-                padding: 40px 0 60px;
-
+                padding-bottom: 5px;
             }
 
 
-            .detail-container {
+            .detail-thumb {
 
-                width: 92%;
+                min-width: 70px;
 
-                padding: 20px;
+                width: 70px;
 
-            }
-
-
-            .detail-main-image {
-
-                height: 400px;
-
+                height: 85px;
             }
 
 
             .detail-info h1 {
 
                 font-size: 32px;
-
             }
 
 
             .detail-price {
 
-                font-size: 23px;
-
-            }
-
-
-            .detail-buttons {
-
-                flex-direction: column;
-
-                width: 100%;
-
-            }
-
-
-            .back-btn,
-            .cart-btn {
-
-                width: 100%;
-
-            }
-
-
-            .detail-footer-content {
-
-                grid-template-columns: 1fr;
-
+                font-size: 24px;
             }
 
         }
@@ -675,7 +567,13 @@ $productImage = getProductImage(
             class="logo"
         >
 
-            Fashion<span>Shop</span>
+            <span class="logo-fashion">
+                Fashion
+            </span>
+
+            <span class="logo-shop">
+                Shop
+            </span>
 
         </a>
 
@@ -686,7 +584,6 @@ $productImage = getProductImage(
                 Trang chủ
             </a>
 
-
             <a
                 href="index.php"
                 class="active"
@@ -694,16 +591,13 @@ $productImage = getProductImage(
                 Sản phẩm
             </a>
 
-
             <a href="index.php?category=1">
                 Áo
             </a>
 
-
             <a href="index.php?category=2">
                 Quần
             </a>
-
 
             <a href="index.php?category=3">
                 Váy
@@ -712,154 +606,204 @@ $productImage = getProductImage(
         </nav>
 
 
-        <a
-            href="../cart/index.php"
-            class="cart"
-        >
+        <div class="header-actions">
 
-            Giỏ hàng
+            <a
+                href="../auth/profile.php"
+                class="header-action"
+            >
 
-            <span>0</span>
+                <svg viewBox="0 0 24 24">
 
-        </a>
+                    <circle
+                        cx="12"
+                        cy="8"
+                        r="4"
+                    ></circle>
 
+                    <path
+                        d="M4 21a8 8 0 0 1 16 0"
+                    ></path>
+
+                </svg>
+
+            </a>
+
+
+            <a
+                href="../cart/index.php"
+                class="header-action cart"
+            >
+
+                <svg viewBox="0 0 24 24">
+
+                    <path
+                        d="M6 8h12l1 13H5L6 8Z"
+                    ></path>
+
+                    <path
+                        d="M9 9V6a3 3 0 0 1 6 0v3"
+                    ></path>
+
+                </svg>
+
+                <span class="cart-count">
+                    0
+                </span>
+
+            </a>
+
+        </div>
 
     </div>
 
 </header>
 
 
-
 <!-- =========================
-     PRODUCT DETAIL
+     DETAIL
 ========================= -->
 
-<section class="detail-page">
+<main class="detail-page">
 
     <div class="container">
 
-
-        <div class="detail-container">
+        <div class="detail-layout">
 
 
             <!-- =========================
-                 PRODUCT IMAGE
+                 GALLERY
             ========================= -->
 
             <div class="detail-gallery">
 
+
+                <div class="detail-thumbnails">
+
+                    <?php foreach ($allImages as $index => $img): ?>
+
+                        <?php
+                        $thumbImage = detailImage(
+                            $img['image']
+                        );
+                        ?>
+
+                        <button
+                            type="button"
+                            class="detail-thumb <?= $index === 0 ? 'active' : '' ?>"
+                            onclick="changeImage(this.dataset.image, this)"
+                            data-image="<?= htmlspecialchars(
+                                $thumbImage,
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>"
+                        >
+
+                            <img
+                                src="<?= htmlspecialchars(
+                                    $thumbImage,
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>"
+                                alt="Ảnh sản phẩm"
+                                onerror="this.src='../assets/images/no-image.jpg';"
+                            >
+
+                        </button>
+
+                    <?php endforeach; ?>
+
+                </div>
+
+
                 <div class="detail-main-image">
 
                     <img
-                        src="<?= htmlspecialchars($productImage) ?>"
-                        alt="<?= htmlspecialchars(
-                            $product['name'] ?? 'Sản phẩm'
+                        id="mainProductImage"
+                        src="<?= htmlspecialchars(
+                            $mainImage,
+                            ENT_QUOTES,
+                            'UTF-8'
                         ) ?>"
+                        alt="<?= htmlspecialchars(
+                            $product['name']
+                        ) ?>"
+                        onerror="this.src='../assets/images/no-image.jpg';"
                     >
 
                 </div>
 
+
             </div>
 
 
-
             <!-- =========================
-                 PRODUCT INFO
+                 INFO
             ========================= -->
 
             <div class="detail-info">
 
+                <div class="detail-category">
 
-                <p class="detail-category">
+                    FASHION
 
-                    <?= htmlspecialchars(
-                        $product['category_name']
-                        ?? 'Thời trang'
-                    ) ?>
-
-                </p>
+                </div>
 
 
                 <h1>
 
                     <?= htmlspecialchars(
                         $product['name']
-                        ?? 'Sản phẩm'
                     ) ?>
 
                 </h1>
 
 
-                <p class="detail-price">
+                <div class="detail-price">
 
                     <?= number_format(
-                        (float)(
-                            $product['price'] ?? 0
-                        ),
+                        (float)$product['price'],
                         0,
                         ',',
                         '.'
                     ) ?>đ
 
-                </p>
+                </div>
 
 
                 <p class="detail-description">
 
                     <?= nl2br(
                         htmlspecialchars(
-                            $product['description']
-                            ??
-                            'Sản phẩm thời trang chất lượng cao.'
+                            $product['description'] ?? ''
                         )
                     ) ?>
 
                 </p>
 
 
-                <p class="detail-stock">
+                <div class="detail-stock">
 
                     Còn lại:
 
-                    <strong>
-
-                        <?= (int)(
-                            $product['stock'] ?? 0
-                        ) ?>
-
-                    </strong>
+                    <?= (int)(
+                        $product['stock'] ?? 0
+                    ) ?>
 
                     sản phẩm
-
-                </p>
-
-
-                <div class="detail-buttons">
-
-
-                    <a
-                        href="index.php"
-                        class="back-btn"
-                    >
-
-                        ← Quay lại
-
-                    </a>
-
-
-                    <a
-                        href="../cart/add.php?id=<?= (int)$product['id'] ?>"
-                        class="cart-btn"
-                    >
-
-                        Thêm vào giỏ
-
-                    </a>
-
 
                 </div>
 
 
+                <a
+                    href="index.php"
+                    class="back-products"
+                >
+
+                    ← Quay lại sản phẩm
+
+                </a>
+
             </div>
 
 
@@ -867,99 +811,36 @@ $productImage = getProductImage(
 
     </div>
 
-</section>
+</main>
 
 
+<script>
 
-<!-- =========================
-     FOOTER
-========================= -->
+function changeImage(src, button) {
 
-<footer class="detail-footer">
-
-    <div class="container">
-
-
-        <div class="detail-footer-content">
+    const mainImage =
+        document.getElementById(
+            "mainProductImage"
+        );
 
 
-            <div>
-
-                <h3>
-                    Fashion<span>Shop</span>
-                </h3>
-
-                <p>
-
-                    Thời trang trẻ trung,
-                    hiện đại và phù hợp
-                    với phong cách riêng
-                    của bạn.
-
-                </p>
-
-            </div>
+    mainImage.src = src;
 
 
-            <div>
+    document
+        .querySelectorAll(".detail-thumb")
+        .forEach(function(item) {
 
-                <h4>
-                    Danh mục
-                </h4>
+            item.classList.remove("active");
 
-                <a href="index.php">
-                    Tất cả sản phẩm
-                </a>
-
-                <a href="index.php?category=1">
-                    Áo
-                </a>
-
-                <a href="index.php?category=2">
-                    Quần
-                </a>
-
-                <a href="index.php?category=3">
-                    Váy
-                </a>
-
-            </div>
+        });
 
 
-            <div>
+    button.classList.add("active");
 
-                <h4>
-                    Hỗ trợ
-                </h4>
+}
 
-                <a href="#">
-                    Chính sách đổi trả
-                </a>
-
-                <a href="#">
-                    Vận chuyển
-                </a>
-
-                <a href="#">
-                    Liên hệ
-                </a>
-
-            </div>
-
-
-        </div>
-
-
-        <div class="detail-copyright">
-
-            © 2026 Fashion Shop
-
-        </div>
-
-
-    </div>
-
-</footer>
+</script>
 
 
 </body>
