@@ -206,334 +206,164 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Thanh toán - Fashion Shop</title>
-
-    <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-        }
-
-        .container {
-            width: 90%;
-            max-width: 1100px;
-            margin: 40px auto;
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .checkout {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 25px;
-        }
-
-        .box {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-        }
-
-        .box h2 {
-            margin-top: 0;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 7px;
-            font-weight: bold;
-        }
-
-        input,
-        textarea {
-            width: 100%;
-            padding: 11px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 15px;
-        }
-
-        textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .error {
-            background: #f8d7da;
-            color: #842029;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-
-        .order-item {
-            display: flex;
-            justify-content: space-between;
-            gap: 15px;
-            padding: 12px 0;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .order-item-name {
-            flex: 1;
-        }
-
-        .total {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-            font-size: 20px;
-            font-weight: bold;
-        }
-
-        .button {
-            width: 100%;
-            padding: 13px;
-            margin-top: 20px;
-            border: none;
-            border-radius: 6px;
-            background: #198754;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        .back {
-            display: inline-block;
-            margin-top: 15px;
-            color: #333;
-            text-decoration: none;
-        }
-
-        @media (max-width: 800px) {
-
-            .checkout {
-                grid-template-columns: 1fr;
-            }
-
-        }
-
-    </style>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Hoàn tất thông tin giao hàng và đặt hàng tại Fashion Shop.">
+    <title>Thanh toán | Fashion Shop</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 
-<body>
+<body class="site-body checkout-page">
+<?php
+$siteBasePath = '../';
+$currentPage = 'cart';
+$currentCategory = 0;
+$cartCount = count($cart);
+require __DIR__ . '/../includes/header.php';
+?>
 
-<div class="container">
+<main id="main-content">
+    <section class="page-intro page-intro--compact checkout-intro">
+        <div class="site-container">
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+                <a href="../index.php">Trang chủ</a>
+                <span aria-hidden="true">/</span>
+                <a href="index.php">Giỏ hàng</a>
+                <span aria-hidden="true">/</span>
+                <span aria-current="page">Thanh toán</span>
+            </nav>
 
-    <h1>Thanh toán & Đặt hàng</h1>
-
-    <?php if ($error !== ''): ?>
-
-        <div class="error">
-            <?= htmlspecialchars($error) ?>
+            <div class="page-intro__content">
+                <p class="eyebrow">Secure checkout</p>
+                <h1>Thanh toán</h1>
+                <p>Hoàn tất thông tin giao hàng để xác nhận đơn hàng của bạn.</p>
+            </div>
         </div>
+    </section>
 
-    <?php endif; ?>
-
-    <div class="checkout">
-
-        <!-- THÔNG TIN NHẬN HÀNG -->
-
-        <div class="box">
-
-            <h2>Thông tin nhận hàng</h2>
-
-            <form method="POST">
-
-                <div class="form-group">
-
-                    <label for="receiver_name">
-                        Họ và tên *
-                    </label>
-
-                    <input
-                        type="text"
-                        id="receiver_name"
-                        name="receiver_name"
-                        value="<?= htmlspecialchars(
-                            $_POST['receiver_name'] ?? ''
-                        ) ?>"
-                        required
-                    >
-
+    <section class="checkout-section" aria-label="Thông tin thanh toán">
+        <div class="site-container checkout-layout">
+            <div class="checkout-form-panel">
+                <div class="checkout-panel__heading">
+                    <span>01</span>
+                    <div>
+                        <p class="eyebrow">Delivery details</p>
+                        <h2>Thông tin giao hàng</h2>
+                    </div>
                 </div>
 
-                <div class="form-group">
+                <?php if ($error !== ''): ?>
+                    <div class="form-alert" role="alert">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9"></circle>
+                            <path d="M12 7.5v5M12 16.5v.1"></path>
+                        </svg>
+                        <?= htmlspecialchars($error) ?>
+                    </div>
+                <?php endif; ?>
 
-                    <label for="phone">
-                        Số điện thoại *
-                    </label>
-
-                    <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        value="<?= htmlspecialchars(
-                            $_POST['phone'] ?? ''
-                        ) ?>"
-                        required
-                    >
-
-                </div>
-
-                <div class="form-group">
-
-                    <label for="address">
-                        Địa chỉ nhận hàng *
-                    </label>
-
-                    <textarea
-                        id="address"
-                        name="address"
-                        required
-                    ><?= htmlspecialchars(
-                        $_POST['address'] ?? ''
-                    ) ?></textarea>
-
-                </div>
-
-                <button
-
-                    type="submit"
-
-                    class="button"
-
-                >
-
-                    Xác nhận đặt hàng
-
-                </button>
-
-            </form>
-
-            <a
-
-                href="index.php"
-
-                class="back"
-
-            >
-
-                ← Quay lại giỏ hàng
-
-            </a>
-
-        </div>
-
-        <!-- TÓM TẮT ĐƠN HÀNG -->
-
-        <div class="box">
-
-            <h2>Đơn hàng của bạn</h2>
-
-            <?php foreach ($cart as $item): ?>
-
-                <?php
-
-                $subtotal =
-
-                    $item['price'] * $item['quantity'];
-
-                ?>
-
-                <div class="order-item">
-
-                    <div class="order-item-name">
-
-                        <?= htmlspecialchars(
-
-                            $item['name']
-
-                        ) ?>
-
-                        <br>
-
-                        <small>
-
-                            Số lượng:
-
-                            <?= (int) $item['quantity'] ?>
-
-                        </small>
-
+                <form method="POST" class="checkout-form">
+                    <div class="form-field">
+                        <label for="receiver_name">Họ và tên <span aria-hidden="true">*</span></label>
+                        <input
+                            type="text"
+                            id="receiver_name"
+                            name="receiver_name"
+                            value="<?= htmlspecialchars($_POST['receiver_name'] ?? '') ?>"
+                            autocomplete="name"
+                            placeholder="Nhập họ và tên người nhận"
+                            required
+                        >
                     </div>
 
-                    <strong>
+                    <div class="form-field">
+                        <label for="phone">Số điện thoại <span aria-hidden="true">*</span></label>
+                        <input
+                            type="tel"
+                            id="phone"
+                            name="phone"
+                            value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>"
+                            autocomplete="tel"
+                            inputmode="tel"
+                            placeholder="Nhập số điện thoại"
+                            required
+                        >
+                    </div>
 
-                        <?= number_format(
+                    <div class="form-field">
+                        <label for="address">Địa chỉ nhận hàng <span aria-hidden="true">*</span></label>
+                        <textarea
+                            id="address"
+                            name="address"
+                            autocomplete="street-address"
+                            placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
+                            required
+                        ><?= htmlspecialchars($_POST['address'] ?? '') ?></textarea>
+                    </div>
 
-                            $subtotal,
+                    <button type="submit" class="button button--primary checkout-submit">
+                        Xác nhận đặt hàng
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5"></path></svg>
+                    </button>
+                </form>
 
-                            0,
-
-                            ',',
-
-                            '.'
-
-                        ) ?>
-
-                        VNĐ
-
-                    </strong>
-
-                </div>
-
-            <?php endforeach; ?>
-
-            <div class="total">
-
-                <span>Tổng cộng:</span>
-
-                <span>
-
-                    <?= number_format(
-
-                        $total,
-
-                        0,
-
-                        ',',
-
-                        '.'
-
-                    ) ?>
-
-                    VNĐ
-
-                </span>
-
+                <a class="checkout-back" href="index.php">← Quay lại giỏ hàng</a>
             </div>
 
+            <aside class="checkout-summary" aria-labelledby="checkout-summary-title">
+                <div class="checkout-panel__heading">
+                    <span>02</span>
+                    <div>
+                        <p class="eyebrow">Order summary</p>
+                        <h2 id="checkout-summary-title">Đơn hàng của bạn</h2>
+                    </div>
+                </div>
+
+                <div class="checkout-summary__items">
+                    <?php foreach ($cart as $item): ?>
+                        <?php
+
+                        $subtotal =
+
+                            $item['price'] * $item['quantity'];
+
+                        ?>
+                        <div class="checkout-item">
+                            <div>
+                                <h3><?= htmlspecialchars($item['name']) ?></h3>
+                                <span>Số lượng: <?= (int)$item['quantity'] ?></span>
+                            </div>
+                            <strong><?= number_format($subtotal, 0, ',', '.') ?>đ</strong>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="checkout-summary__meta">
+                    <div>
+                        <span>Tạm tính</span>
+                        <strong><?= number_format($total, 0, ',', '.') ?>đ</strong>
+                    </div>
+                    <div>
+                        <span>Phí vận chuyển</span>
+                        <strong>Tính theo địa chỉ</strong>
+                    </div>
+                </div>
+
+                <div class="checkout-summary__total">
+                    <span>Tổng cộng</span>
+                    <strong><?= number_format($total, 0, ',', '.') ?>đ</strong>
+                </div>
+
+                <p class="checkout-summary__note">
+                    Thông tin đơn hàng sẽ được xác nhận sau khi bạn hoàn tất đặt hàng.
+                </p>
+            </aside>
         </div>
+    </section>
+</main>
 
-    </div>
-
-</div>
-
+<?php require __DIR__ . '/../includes/footer.php'; ?>
+<script src="../assets/js/main.js" defer></script>
 </body>
-
 </html>
