@@ -1,475 +1,124 @@
 <?php
-
-require_once '../config/database.php';
-require_once 'auth_check.php';
-
-require_login();
+require_once 'db.php';
+require_login(); // Kiểm tra đăng nhập
 
 $user_id = $_SESSION['user']['id'];
+$msg = '';
 
-$success = '';
-$error = '';
-
-$name = '';
-$email = '';
-$phone = '';
-$address = '';
-$role = '';
-
-/*
-|--------------------------------------------------------------------------
-| Lấy thông tin user hiện tại
-|--------------------------------------------------------------------------
-*/
-
-$stmt = $conn->prepare(
-    "SELECT id, name, email, phone, address, role
-     FROM users
-     WHERE id = ?
-     LIMIT 1"
-);
-
-$stmt->bind_param('i', $user_id);
-$stmt->execute();
-
-$result = $stmt->get_result();
-
-if ($result->num_rows !== 1) {
-
-    session_destroy();
-
-    header('Location: login.php');
-    exit;
-}
-
-$user = $result->fetch_assoc();
-
-$stmt->close();
-
-$name = $user['name'];
-$email = $user['email'];
-$phone = $user['phone'] ?? '';
-$address = $user['address'] ?? '';
-$role = $user['role'];
-
-/*
-|--------------------------------------------------------------------------
-| Cập nhật thông tin
-|--------------------------------------------------------------------------
-*/
-
+// Xử lý cập nhật thông tin
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
+    $full_name = trim($_POST['full_name'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
-    $address = trim($_POST['address'] ?? '');
-
     $new_password = $_POST['new_password'] ?? '';
-    $confirm_password = $_POST['confirm_password'] ?? '';
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate
-    |--------------------------------------------------------------------------
-    */
-
-    if ($name === '') {
-
-        $error = 'Họ tên không được để trống.';
-
-    } elseif ($email === '') {
-
-        $error = 'Email không được để trống.';
-
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-
-        $error = 'Email không hợp lệ.';
-
-    } elseif (
-        $new_password !== '' &&
-        strlen($new_password) < 6
-    ) {
-
-        $error = 'Mật khẩu mới phải có ít nhất 6 ký tự.';
-
-    } elseif (
-        $new_password !== $confirm_password
-    ) {
-
-        $error = 'Xác nhận mật khẩu mới không khớp.';
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Kiểm tra email có bị người khác sử dụng không
-    |--------------------------------------------------------------------------
-    */
-
-    if ($error === '') {
-
-        $stmt = $conn->prepare(
-            "SELECT id
-             FROM users
-             WHERE email = ?
-             AND id != ?
-             LIMIT 1"
-        );
-
-        $stmt->bind_param(
-            'si',
-            $email,
-            $user_id
-        );
-
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-
-        if ($result->num_rows > 0) {
-
-            $error = 'Email này đã được tài khoản khác sử dụng.';
-        }
-
-        $stmt->close();
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Update database
-    |--------------------------------------------------------------------------
-    */
-
-    if ($error === '') {
-
-        if ($new_password !== '') {
-
-            // Có đổi mật khẩu
-            $hashed_password = password_hash(
-                $new_password,
-                PASSWORD_DEFAULT
-            );
-
-            $stmt = $conn->prepare(
-                "UPDATE users
-                 SET name = ?,
-                     email = ?,
-                     phone = ?,
-                     address = ?,
-                     password = ?
-                 WHERE id = ?"
-            );
-
-            $stmt->bind_param(
-                'sssssi',
-                $name,
-                $email,
-                $phone,
-                $address,
-                $hashed_password,
-                $user_id
-            );
-
+    if (!empty($full_name)) {
+        if (!empty($new_password)) {
+            if (strlen($new_password) < 6) {
+                $msg = '<div class="msg error">Mật khẩu mới phải từ 6 ký tự trở lên!</div>';
+            } else {
+                $hashed = password_hash($new_password, PASSWORD_BCRYPT);
+                $stmt = $pdo->prepare("UPDATE users SET full_name = ?, phone = ?, password = ? WHERE id = ?");
+                $stmt->execute([$full_name, $phone, $hashed, $user_id]);
+                $msg = '<div class="msg success">Cập nhật thông tin và mật khẩu thành công!</div>';
+            }
         } else {
-
-            // Không đổi mật khẩu
-            $stmt = $conn->prepare(
-                "UPDATE users
-                 SET name = ?,
-                     email = ?,
-                     phone = ?,
-                     address = ?
-                 WHERE id = ?"
-            );
-
-            $stmt->bind_param(
-                'ssssi',
-                $name,
-                $email,
-                $phone,
-                $address,
-                $user_id
-            );
+            $stmt = $pdo->prepare("UPDATE users SET full_name = ?, phone = ? WHERE id = ?");
+            $stmt->execute([$full_name, $phone, $user_id]);
+            $msg = '<div class="msg success">Cập nhật thông tin thành công!</div>';
         }
-
-        if ($stmt->execute()) {
-
-            $success = 'Cập nhật thông tin thành công.';
-
-            /*
-            |--------------------------------------------------------------------------
-            | Cập nhật lại SESSION
-            |--------------------------------------------------------------------------
-            */
-
-            $_SESSION['user']['name'] = $name;
-            $_SESSION['user']['email'] = $email;
-            $_SESSION['user']['phone'] = $phone;
-            $_SESSION['user']['address'] = $address;
-
-        } else {
-
-            $error = 'Cập nhật thất bại. Vui lòng thử lại.';
-        }
-
-        $stmt->close();
+        
+        // Cập nhật lại session
+        $_SESSION['user']['full_name'] = $full_name;
+        $_SESSION['user']['phone'] = $phone;
     }
 }
 
+// Lấy thông tin mới nhất từ database
+$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$currentUser = $stmt->fetch();
 ?>
-
 <!DOCTYPE html>
 <html lang="vi">
-
 <head>
-
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Thông tin cá nhân</title>
-
+    <title>Hồ sơ cá nhân</title>
     <style>
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-        }
-
-        .container {
-            width: 650px;
-            max-width: 95%;
-            margin: 50px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .form-group {
-            margin-bottom: 18px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 7px;
-            font-weight: bold;
-        }
-
-        input,
-        textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 15px;
-        }
-
-        textarea {
-            min-height: 90px;
-            resize: vertical;
-        }
-
-        input[readonly] {
-            background: #eee;
-        }
-
-        button {
-            width: 100%;
-            padding: 13px;
-            background: #111;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #333;
-        }
-
-        .success {
-            background: #e4f8e8;
-            color: #137333;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-
-        .error {
-            background: #ffe5e5;
-            color: #c00;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-
-        .account-info {
-            background: #f7f7f7;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 25px;
-        }
-
-        .role {
-            font-weight: bold;
-            color: #0066cc;
-        }
-
-        .links {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .links a {
-            color: #0066cc;
-            text-decoration: none;
-            margin: 0 8px;
-        }
-
+        body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 13px; font-weight: bold; color: #fff; text-transform: uppercase; }
+        .badge-admin { background: #dc3545; }
+        .badge-staff { background: #ffc107; color: #000; }
+        .badge-customer { background: #17a2b8; }
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-weight: bold; margin-bottom: 4px; }
+        input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 10px 18px; background: #007bff; border: none; color: #fff; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .logout-btn { float: right; background: #6c757d; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-size: 13px; }
+        .msg { padding: 10px; border-radius: 4px; margin-bottom: 15px; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+        .role-section { margin-top: 25px; padding-top: 15px; border-top: 2px dashed #ddd; }
     </style>
-
 </head>
-
 <body>
-
 <div class="container">
-
-    <h1>Thông tin cá nhân</h1>
-
-    <div class="account-info">
-
-        <strong>Loại tài khoản:</strong>
-
-        <span class="role">
-            <?= $role === 'admin' ? 'Admin' : 'User' ?>
+    <a href="logout.php" class="logout-btn">Đăng xuất</a>
+    <h2>Hồ Sơ Cá Nhân</h2>
+    
+    <p>
+        <strong>Vai trò:</strong> 
+        <span class="badge badge-<?= htmlspecialchars($currentUser['role']) ?>">
+            <?= htmlspecialchars($currentUser['role']) ?>
         </span>
+    </p>
 
-    </div>
+    <?= $msg ?>
 
-    <?php if ($success !== ''): ?>
-
-        <div class="success">
-            <?= htmlspecialchars($success) ?>
-        </div>
-
-    <?php endif; ?>
-
-    <?php if ($error !== ''): ?>
-
-        <div class="error">
-            <?= htmlspecialchars($error) ?>
-        </div>
-
-    <?php endif; ?>
-
-    <form method="POST">
-
+    <form method="POST" action="profile.php">
         <div class="form-group">
-
-            <label>Họ và tên</label>
-
-            <input
-                type="text"
-                name="name"
-                value="<?= htmlspecialchars($name) ?>"
-                required
-            >
-
+            <label>Email (Không thể thay đổi):</label>
+            <input type="email" value="<?= htmlspecialchars($currentUser['email']) ?>" disabled>
         </div>
-
         <div class="form-group">
-
-            <label>Email</label>
-
-            <input
-                type="email"
-                name="email"
-                value="<?= htmlspecialchars($email) ?>"
-                required
-            >
-
+            <label>Họ và tên:</label>
+            <input type="text" name="full_name" value="<?= htmlspecialchars($currentUser['full_name']) ?>" required>
         </div>
-
         <div class="form-group">
-
-            <label>Số điện thoại</label>
-
-            <input
-                type="text"
-                name="phone"
-                value="<?= htmlspecialchars($phone) ?>"
-            >
-
+            <label>Số điện thoại:</label>
+            <input type="text" name="phone" value="<?= htmlspecialchars($currentUser['phone'] ?? '') ?>">
         </div>
-
         <div class="form-group">
-
-            <label>Địa chỉ</label>
-
-            <textarea name="address"><?= htmlspecialchars($address) ?></textarea>
-
+            <label>Đổi mật khẩu mới (để trống nếu không đổi):</label>
+            <input type="password" name="new_password" placeholder="Nhập mật khẩu mới...">
         </div>
-
-        <hr>
-
-        <h3>Đổi mật khẩu</h3>
-
-        <p>
-            Nếu không muốn đổi mật khẩu, hãy để trống hai ô bên dưới.
-        </p>
-
-        <div class="form-group">
-
-            <label>Mật khẩu mới</label>
-
-            <input
-                type="password"
-                name="new_password"
-                minlength="6"
-            >
-
-        </div>
-
-        <div class="form-group">
-
-            <label>Xác nhận mật khẩu mới</label>
-
-            <input
-                type="password"
-                name="confirm_password"
-                minlength="6"
-            >
-
-        </div>
-
-        <button type="submit">
-            Cập nhật thông tin
-        </button>
-
+        <button type="submit">Lưu thông tin</button>
     </form>
 
-    <div class="links">
-
-        <a href="../index.php">Trang chủ</a>
-
-        |
-
-        <a href="logout.php">Đăng xuất</a>
-
+    <!-- Khu vực hiển thị riêng biệt theo phân quyền -->
+    <div class="role-section">
+        <h3>Chức năng theo quyền của bạn:</h3>
+        <?php if ($currentUser['role'] === 'admin'): ?>
+            <p style="color: #dc3545; font-weight: bold;">[Khu vực Admin] Toàn quyền quản lý:</p>
+            <ul>
+                <li>Xem báo cáo doanh thu cửa hàng</li>
+                <li>Quản lý danh sách tài khoản & Phân quyền user</li>
+                <li>Xóa & Khóa tài khoản khách hàng / nhân viên</li>
+            </ul>
+        <?php elseif ($currentUser['role'] === 'staff'): ?>
+            <p style="color: #d39e00; font-weight: bold;">[Khu vực Nhân viên]:</p>
+            <ul>
+                <li>Quản lý sản phẩm thời trang & Tồn kho</li>
+                <li>Xác nhận đơn hàng và giao hàng</li>
+            </ul>
+        <?php else: ?>
+            <p style="color: #17a2b8; font-weight: bold;">[Khu vực Khách hàng]:</p>
+            <ul>
+                <li>Xem lịch sử đặt hàng thời trang</li>
+                <li>Quản lý sổ địa chỉ nhận hàng</li>
+            </ul>
+        <?php endif; ?>
     </div>
-
 </div>
-
 </body>
 </html>
