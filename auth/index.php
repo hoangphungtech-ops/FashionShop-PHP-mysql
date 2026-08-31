@@ -2,10 +2,10 @@
 session_start();
 
 if (isset($_SESSION['user_id'])) {
-    header("Location: profile.php");
+    header("Location: /FashionShop-PHP-mysql/auth/profile.php");
     exit();
 } else {
-    header("Location: login-register.php");
+    header("Location: /FashionShop-PHP-mysql/auth/login-register.php");
     exit();
 }
 ?>

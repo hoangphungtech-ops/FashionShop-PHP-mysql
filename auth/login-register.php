@@ -44,7 +44,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['role'] = $user['role'];
-            header("Location: profile.php");
+            header("Location: /FashionShop-PHP-mysql");
             exit();
         } else {
             $message = "<div class='alert alert-danger'>Email hoặc mật khẩu không chính xác!</div>";
