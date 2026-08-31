@@ -10,9 +10,11 @@ $products = [];
 
 try {
 
-    $sql = "SELECT * FROM products
-            WHERE status = 1
-            ORDER BY id DESC
+    $sql = "SELECT products.*, categories.name AS category_name
+            FROM products
+            LEFT JOIN categories ON categories.id = products.category_id
+            WHERE products.status = 1
+            ORDER BY products.id DESC
             LIMIT 6";
 
     $stmt = $pdo->query($sql);
@@ -85,203 +87,557 @@ function getProductImage($image)
 
 ?>
 
+
 <!DOCTYPE html>
+
 <html lang="vi">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Fashion Shop - thời trang hiện đại, thanh lịch và được tuyển chọn cho phong cách riêng của bạn.">
-    <title>Fashion Shop | Thời trang dành cho bạn</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Fashion Shop</title>
+
+    <link rel="stylesheet"
+          href="assets/css/style.css">
+
 </head>
 
-<body class="site-body home-page">
-<?php
-$siteBasePath = '';
-$currentPage = 'home';
-$currentCategory = 0;
-$cartCount = 0;
-require __DIR__ . '/includes/header.php';
-?>
 
-<main id="main-content">
-    <section class="home-hero">
-        <div class="site-container home-hero__grid">
-            <div class="home-hero__content">
-                <p class="eyebrow">New season · 2026</p>
-                <h1>Thời trang<br><em>dành cho bạn</em></h1>
-                <p class="home-hero__intro">
-                    Những thiết kế hiện đại, tinh tế và dễ mặc — được tuyển chọn để bạn tự tin thể hiện phong cách riêng mỗi ngày.
-                </p>
-                <div class="home-hero__actions">
-                    <a class="button button--primary" href="products/index.php">
-                        Khám phá sản phẩm
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5"></path></svg>
-                    </a>
-                    <a class="text-link" href="#featured-products">Xem bộ sưu tập mới</a>
-                </div>
-                <div class="home-hero__note" aria-label="Cam kết của Fashion Shop">
-                    <span>Chọn lọc kỹ lưỡng</span>
-                    <span>Phong cách hiện đại</span>
-                </div>
-            </div>
+<body class="home-page">
 
-            <div class="home-hero__visual">
-                <div class="home-hero__frame">
-                    <img
-                        src="assets/images/vay-nu-thanh-lich.jpg"
-                        alt="Váy nữ thanh lịch trong bộ sưu tập Fashion Shop"
-                    >
-                </div>
-                <p class="home-hero__caption"><span>01</span> The everyday edit</p>
-            </div>
+
+<!-- =========================
+     HEADER
+========================= -->
+
+<header class="header">
+
+    <div class="container header-content">
+
+
+        <a href="index.php"
+           class="logo">
+
+            <span class="logo-fashion">Fashion</span><span class="logo-shop">Shop</span>
+
+        </a>
+
+
+        <button
+            class="menu-toggle"
+            type="button"
+            aria-label="Mở menu"
+            aria-controls="primary-navigation"
+            aria-expanded="false"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+
+        <nav class="nav" id="primary-navigation" aria-label="Điều hướng chính">
+
+            <a href="index.php" class="active" aria-current="page">
+                Trang chủ
+            </a>
+
+            <a href="products/index.php">
+                Sản phẩm
+            </a>
+
+            <a href="products/index.php?gender=nam">
+                Nam
+            </a>
+
+            <a href="products/index.php?gender=nu">
+                Nữ
+            </a>
+
+            <a href="products/index.php?category=1">
+                Áo
+            </a>
+
+            <a href="products/index.php?category=2">
+                Quần
+            </a>
+
+            <a href="products/index.php?category=3">
+                Váy
+            </a>
+
+        </nav>
+
+
+        <div class="header-actions">
+
+            <a href="auth/profile.php"
+               class="header-action account-link">
+
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="8" r="4"></circle>
+                    <path d="M4 21a8 8 0 0 1 16 0"></path>
+                </svg>
+
+                <span class="action-label">Tài khoản</span>
+
+            </a>
+
+
+            <a href="cart/index.php"
+               class="header-action cart">
+
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 8h12l1 13H5L6 8Z"></path>
+                    <path d="M9 9V6a3 3 0 0 1 6 0v3"></path>
+                </svg>
+
+                <span class="action-label">Giỏ hàng</span>
+
+                <span class="cart-count" aria-label="0 sản phẩm">0</span>
+
+            </a>
+
         </div>
-    </section>
 
-    <section class="category-edit" aria-labelledby="category-heading">
-        <div class="site-container">
-            <div class="section-heading section-heading--split">
-                <div>
-                    <p class="eyebrow">Shop by category</p>
-                    <h2 id="category-heading">Chọn phong cách của bạn</h2>
-                </div>
-                <p>Những lựa chọn thiết yếu để xây dựng tủ đồ hiện đại, thanh lịch và linh hoạt.</p>
+
+    </div>
+
+</header>
+
+
+
+<!-- =========================
+     HERO
+========================= -->
+
+<section class="hero">
+
+    <div class="container hero-content">
+
+
+        <div class="hero-text">
+
+            <div class="small-title">
+                FASHION SHOP
             </div>
 
-            <div class="category-grid">
-                <a class="category-tile category-tile--large" href="products/index.php?category=1">
-                    <img src="assets/images/ao-so-mi-nu - Copy.jpg" alt="Bộ sưu tập áo">
-                    <span class="category-tile__overlay"></span>
-                    <span class="category-tile__content">
-                        <small>01 · Collection</small>
-                        <strong>Áo</strong>
-                        <span>Khám phá <b aria-hidden="true">↗</b></span>
-                    </span>
-                </a>
 
-                <a class="category-tile" href="products/index.php?category=2">
-                    <img src="assets/images/quan-jean-nu.jpg" alt="Bộ sưu tập quần">
-                    <span class="category-tile__overlay"></span>
-                    <span class="category-tile__content">
-                        <small>02 · Collection</small>
-                        <strong>Quần</strong>
-                        <span>Khám phá <b aria-hidden="true">↗</b></span>
-                    </span>
-                </a>
+            <h1>
 
-                <a class="category-tile" href="products/index.php?category=3">
-                    <img src="assets/images/vay-nu-thanh-lich.jpg" alt="Bộ sưu tập váy">
-                    <span class="category-tile__overlay"></span>
-                    <span class="category-tile__content">
-                        <small>03 · Collection</small>
-                        <strong>Váy</strong>
-                        <span>Khám phá <b aria-hidden="true">↗</b></span>
-                    </span>
-                </a>
-            </div>
+                Thời trang
+
+                <span>
+                    dành cho bạn
+                </span>
+
+            </h1>
+
+
+            <p>
+
+                Khám phá những thiết kế thời trang
+                trẻ trung, hiện đại và thanh lịch.
+                Tìm cho mình phong cách phù hợp
+                với cá tính riêng của bạn.
+
+            </p>
+
+
+            <a href="products/index.php"
+               class="btn">
+
+                Khám phá sản phẩm
+
+                <span>→</span>
+
+            </a>
+
         </div>
-    </section>
 
-    <section class="featured-products" id="featured-products" aria-labelledby="featured-heading">
-        <div class="site-container">
-            <div class="section-heading section-heading--split section-heading--baseline">
-                <div>
-                    <p class="eyebrow">Selected for you</p>
-                    <h2 id="featured-heading">Sản phẩm nổi bật</h2>
+
+
+        <div class="hero-image">
+
+            <img
+                src="assets/images/hero-fashion-nu-new.png"
+                alt="Người mẫu nữ trong thiết kế thanh lịch của Fashion Shop"
+            >
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- =========================
+     PRODUCTS
+========================= -->
+
+<section class="products">
+
+    <div class="container">
+
+
+        <div class="section-header">
+
+
+            <div>
+
+                <div class="small-title">
+                    OUR COLLECTION
                 </div>
-                <a class="text-link text-link--arrow" href="products/index.php">Xem tất cả sản phẩm <span>→</span></a>
+
+
+                <h2>
+                    Sản phẩm nổi bật
+                </h2>
+
             </div>
+
+
+            <a href="products/index.php"
+               class="view-all">
+
+                Xem tất cả →
+
+            </a>
+
+
+        </div>
+
+
+
+        <div class="product-grid">
+
 
             <?php if (!empty($products)): ?>
-                <div class="product-grid">
-                    <?php foreach ($products as $product): ?>
-                        <?php $image = getProductImage($product['image'] ?? ''); ?>
-                        <article class="product-card">
-                            <a
-                                class="product-card__media"
-                                href="products/detail.php?id=<?= (int)$product['id'] ?>"
+
+
+                <?php foreach ($products as $product): ?>
+
+
+                    <?php
+
+                    $image = getProductImage(
+                        $product['image'] ?? ''
+                    );
+
+                    $productName = (string)($product['name'] ?? 'Sản phẩm');
+                    $productGender = preg_match('/(^|\s)nữ($|\s)/iu', $productName)
+                        ? 'NỮ'
+                        : (preg_match('/(^|\s)nam($|\s)/iu', $productName) ? 'NAM' : 'UNISEX');
+                    $productCategory = (string)($product['category_name'] ?? 'THỜI TRANG');
+
+                    ?>
+
+
+                    <div class="product-card">
+
+
+                        <a
+                            href="products/detail.php?id=<?= (int)$product['id'] ?>"
+                            class="product-image"
+                        >
+
+                            <span class="new">
+                                NEW
+                            </span>
+
+
+                            <img
+                                src="<?= htmlspecialchars($image) ?>"
+                                alt="<?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>"
                             >
-                                <span class="product-badge">New</span>
-                                <img
-                                    src="<?= htmlspecialchars($image) ?>"
-                                    alt="<?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>"
-                                    loading="lazy"
+
+                        </a>
+
+
+
+                        <div class="product-info">
+
+
+                            <small>
+                                <?= htmlspecialchars($productGender . ' · ' . $productCategory) ?>
+                            </small>
+
+
+                            <h3>
+
+                                <a
+                                    href="products/detail.php?id=<?= (int)$product['id'] ?>"
                                 >
-                                <span class="product-card__view" aria-hidden="true">Xem chi tiết</span>
-                            </a>
-                            <div class="product-card__body">
-                                <p class="product-card__category">Fashion selection</p>
-                                <h3>
-                                    <a href="products/detail.php?id=<?= (int)$product['id'] ?>">
-                                        <?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>
-                                    </a>
-                                </h3>
-                                <p class="product-card__price">
-                                    <?= number_format((float)($product['price'] ?? 0), 0, ',', '.') ?>đ
-                                </p>
+
+                                    <?= htmlspecialchars(
+                                        $product['name'] ?? 'Sản phẩm'
+                                    ) ?>
+
+                                </a>
+
+                            </h3>
+
+
+                            <div class="price">
+
+                                <?= number_format(
+                                    (float)($product['price'] ?? 0),
+                                    0,
+                                    ',',
+                                    '.'
+                                ) ?>đ
+
                             </div>
-                        </article>
-                    <?php endforeach; ?>
-                </div>
+
+
+                        </div>
+
+                    </div>
+
+
+                <?php endforeach; ?>
+
+
             <?php else: ?>
-                <div class="empty-state">
-                    <p class="eyebrow">Collection update</p>
-                    <h3>Chưa có sản phẩm</h3>
-                    <p>Các sản phẩm mới đang được cập nhật. Vui lòng quay lại sau.</p>
+
+
+                <!-- Nếu database chưa có sản phẩm -->
+
+                <div class="empty-products">
+
+                    <h3>
+                        Chưa có sản phẩm
+                    </h3>
+
+                    <p>
+                        Hiện tại chưa có sản phẩm để hiển thị.
+                    </p>
+
                 </div>
+
+
             <?php endif; ?>
-        </div>
-    </section>
 
-    <section class="brand-story" aria-labelledby="story-heading">
-        <div class="site-container brand-story__grid">
-            <div class="brand-story__image">
-                <img src="assets/images/ao-khoac-denim.jpg" alt="Chi tiết áo khoác denim Fashion Shop" loading="lazy">
-                <span>Modern essentials</span>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- =========================
+     WHY
+========================= -->
+
+<section class="why">
+
+    <div class="container why-content">
+
+
+        <div>
+
+            <div class="small-title">
+                WHY CHOOSE US?
             </div>
 
-            <div class="brand-story__content">
-                <p class="eyebrow">Our philosophy</p>
-                <h2 id="story-heading">Đẹp theo cách<br><em>của bạn.</em></h2>
-                <p>
-                    Chúng tôi tin rằng thời trang tốt không cần phô trương. Mỗi thiết kế được lựa chọn dựa trên sự cân bằng giữa kiểu dáng, chất lượng và khả năng đồng hành cùng bạn mỗi ngày.
-                </p>
-                <div class="brand-values">
-                    <div>
-                        <span>01</span>
-                        <strong>Chất lượng chọn lọc</strong>
-                        <p>Sản phẩm phù hợp cho nhịp sống hiện đại.</p>
-                    </div>
-                    <div>
-                        <span>02</span>
-                        <strong>Thiết kế linh hoạt</strong>
-                        <p>Dễ kết hợp, dễ tạo dấu ấn riêng.</p>
-                    </div>
-                    <div>
-                        <span>03</span>
-                        <strong>Trải nghiệm chỉn chu</strong>
-                        <p>Từ lựa chọn đến khi sản phẩm tới tay bạn.</p>
-                    </div>
+
+            <h2>
+
+                Đẹp theo cách
+
+                <br>
+
+                của bạn.
+
+            </h2>
+
+        </div>
+
+
+
+        <div class="features">
+
+
+            <div class="feature">
+
+                <div class="number">
+                    01
                 </div>
-            </div>
-        </div>
-    </section>
 
-    <section class="final-cta">
-        <div class="site-container final-cta__inner">
+                <h3>
+                    Chất lượng tốt
+                </h3>
+
+                <p>
+                    Sản phẩm được lựa chọn
+                    kỹ càng và phù hợp
+                    để sử dụng hằng ngày.
+                </p>
+
+            </div>
+
+
+
+            <div class="feature">
+
+                <div class="number">
+                    02
+                </div>
+
+                <h3>
+                    Thiết kế hiện đại
+                </h3>
+
+                <p>
+                    Kiểu dáng trẻ trung,
+                    dễ phối đồ và phù hợp
+                    với nhiều phong cách.
+                </p>
+
+            </div>
+
+
+
+            <div class="feature">
+
+                <div class="number">
+                    03
+                </div>
+
+                <h3>
+                    Giao hàng nhanh
+                </h3>
+
+                <p>
+                    Đóng gói cẩn thận
+                    và giao hàng đến
+                    tận nơi.
+                </p>
+
+            </div>
+
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<!-- =========================
+     FOOTER
+========================= -->
+
+<footer class="footer">
+
+    <div class="container">
+
+
+        <div class="footer-content">
+
+
             <div>
-                <p class="eyebrow">Your style, your story</p>
-                <h2>Sẵn sàng làm mới phong cách?</h2>
-            </div>
-            <a class="button button--light" href="products/index.php">
-                Mua sắm ngay
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5"></path></svg>
-            </a>
-        </div>
-    </section>
-</main>
 
-<?php require __DIR__ . '/includes/footer.php'; ?>
+                <h3>
+                    Fashion<span>Shop</span>
+                </h3>
+
+
+                <p>
+
+                    Thời trang trẻ trung,
+                    hiện đại và phù hợp
+                    với phong cách riêng
+                    của bạn.
+
+                </p>
+
+            </div>
+
+
+
+            <div>
+
+                <h4>
+                    Danh mục
+                </h4>
+
+
+                <a href="products/index.php">
+                    Tất cả sản phẩm
+                </a>
+
+
+                <a href="products/index.php?category=1">
+                    Áo
+                </a>
+
+
+                <a href="products/index.php?category=2">
+                    Quần
+                </a>
+
+
+                <a href="products/index.php?category=3">
+                    Váy
+                </a>
+
+            </div>
+
+
+
+            <div>
+
+                <h4>
+                    Hỗ trợ
+                </h4>
+
+
+                <a href="#">
+                    Chính sách đổi trả
+                </a>
+
+
+                <a href="#">
+                    Vận chuyển
+                </a>
+
+
+                <a href="#">
+                    Liên hệ
+                </a>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="copyright">
+
+            © 2026 Fashion Shop
+
+        </div>
+
+
+    </div>
+
+</footer>
+
+
 <script src="assets/js/main.js" defer></script>
+
+
 </body>
+
 </html>
+
