@@ -1,209 +1,157 @@
 <?php
-session_start();
 
-require_once '../config/database.php';
+declare(strict_types=1);
 
-/*
-|--------------------------------------------------------------------------
-| LẤY GIỎ HÀNG
-|--------------------------------------------------------------------------
-*/
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/cart.php';
 
-$cart = $_SESSION['cart'] ?? [];
+$cart = cart_quantities();
 
-if (empty($cart)) {
-    header('Location: index.php');
-    exit;
+if ($cart === []) {
+    cart_flash('error', 'Giỏ hàng đang trống.');
+    safe_redirect('index.php', 'index.php', 303);
 }
 
-/*
-|--------------------------------------------------------------------------
-| LẤY USER ID NẾU ĐÃ ĐĂNG NHẬP
-|--------------------------------------------------------------------------
-*/
-
-$userId = $_SESSION['user_id'] ?? null;
-
-if ($userId === null && isset($_SESSION['user']['id'])) {
-    $userId = $_SESSION['user']['id'];
-}
-
-/*
-|--------------------------------------------------------------------------
-| TÍNH TỔNG ĐƠN HÀNG
-|--------------------------------------------------------------------------
-*/
-
-$total = 0;
-
-foreach ($cart as $item) {
-    $total += $item['price'] * $item['quantity'];
-}
-
+$receiverName = sanitize_text($_POST['receiver_name'] ?? '', 100);
+$phone = sanitize_text($_POST['phone'] ?? '', 20);
+$address = sanitize_text($_POST['address'] ?? '', 255);
 $error = '';
 
-/*
-|--------------------------------------------------------------------------
-| XỬ LÝ ĐẶT HÀNG
-|--------------------------------------------------------------------------
-*/
+try {
+    $cartData = load_cart($pdo);
+} catch (PDOException $exception) {
+    error_log('[checkout] Cannot load cart: ' . $exception->getMessage());
+    $cartData = [
+        'cart' => $cart,
+        'items' => [],
+        'missingIds' => [],
+        'total' => 0.0,
+        'canCheckout' => false,
+    ];
+    $error = 'Chưa thể kiểm tra giỏ hàng. Vui lòng thử lại sau.';
+}
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (is_post_request()) {
+    $csrfToken = $_POST['_csrf_token'] ?? null;
 
-    $receiverName = trim($_POST['receiver_name'] ?? '');
-    $phone        = trim($_POST['phone'] ?? '');
-    $address      = trim($_POST['address'] ?? '');
-
-    /*
-    |--------------------------------------------------------------------------
-    | KIỂM TRA THÔNG TIN
-    |--------------------------------------------------------------------------
-    */
-
-    if ($receiverName === '') {
-
-        $error = 'Vui lòng nhập họ và tên.';
-
-    } elseif ($phone === '') {
-
-        $error = 'Vui lòng nhập số điện thoại.';
-
-    } elseif ($address === '') {
-
-        $error = 'Vui lòng nhập địa chỉ nhận hàng.';
-
+    if (!is_string($csrfToken) || !csrf_validate($csrfToken)) {
+        $error = 'Phiên đặt hàng đã hết hạn. Vui lòng tải lại trang.';
+    } elseif ($receiverName === '' || mb_strlen($receiverName, 'UTF-8') < 2) {
+        $error = 'Vui lòng nhập họ và tên hợp lệ.';
+    } elseif (!preg_match('/^[0-9+().\s-]{8,20}$/', $phone)) {
+        $error = 'Số điện thoại không hợp lệ.';
+    } elseif ($address === '' || mb_strlen($address, 'UTF-8') < 8) {
+        $error = 'Vui lòng nhập địa chỉ nhận hàng đầy đủ.';
     } else {
-
         try {
-
-            /*
-            |--------------------------------------------------------------------------
-            | BẮT ĐẦU TRANSACTION
-            |--------------------------------------------------------------------------
-            */
-
             $pdo->beginTransaction();
+            $lockedCart = load_cart($pdo, true);
 
-            /*
-            |--------------------------------------------------------------------------
-            | LƯU ĐƠN HÀNG
-            |--------------------------------------------------------------------------
-            */
-
-            $stmt = $pdo->prepare("
-                INSERT INTO orders
-                (
-                    user_id,
-                    receiver_name,
-                    phone,
-                    address,
-                    total_amount,
-                    status
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-            ");
-
-            $status = 'pending';
-
-            $stmt->execute([
-                $userId,
-                $receiverName,
-                $phone,
-                $address,
-                $total,
-                $status
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | LẤY ID ĐƠN HÀNG
-            |--------------------------------------------------------------------------
-            */
-
-            $orderId = $pdo->lastInsertId();
-
-            /*
-            |--------------------------------------------------------------------------
-            | LƯU CHI TIẾT ĐƠN HÀNG
-            |--------------------------------------------------------------------------
-            |
-            | Database chung chỉ có:
-            | id
-            | order_id
-            | product_id
-            | quantity
-            | price
-            |
-            */
-
-            $itemStmt = $pdo->prepare("
-                INSERT INTO order_items
-                (
-                    order_id,
-                    product_id,
-                    quantity,
-                    price
-                )
-                VALUES (?, ?, ?, ?)
-            ");
-
-            foreach ($cart as $item) {
-
-                $itemStmt->execute([
-                    $orderId,
-                    $item['id'],
-                    $item['quantity'],
-                    $item['price']
-                ]);
+            if ($lockedCart['cart'] === []
+                || !$lockedCart['canCheckout']
+                || count($lockedCart['items']) !== count($lockedCart['cart'])) {
+                throw new DomainException('Giỏ hàng có sản phẩm không hợp lệ hoặc không đủ tồn kho.');
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | HOÀN TẤT TRANSACTION
-            |--------------------------------------------------------------------------
-            */
+            $totalAmount = number_format((float) $lockedCart['total'], 2, '.', '');
+            $sessionUser = $_SESSION['user'] ?? null;
+            $userId = is_array($sessionUser)
+                ? filter_var($sessionUser['id'] ?? null, FILTER_VALIDATE_INT, [
+                    'options' => ['min_range' => 1],
+                ])
+                : false;
+            $userId = $userId !== false ? (int) $userId : null;
 
-            $pdo->commit();
+            $orderStatement = $pdo->prepare(
+                'INSERT INTO orders
+                    (user_id, receiver_name, phone, address, total_amount, status)
+                 VALUES
+                    (:user_id, :receiver_name, :phone, :address, :total_amount, :status)'
+            );
+            $orderStatement->execute([
+                ':user_id' => $userId,
+                ':receiver_name' => $receiverName,
+                ':phone' => $phone,
+                ':address' => $address,
+                ':total_amount' => $totalAmount,
+                ':status' => 'pending',
+            ]);
+            $orderId = (int) $pdo->lastInsertId();
 
-            /*
-            |--------------------------------------------------------------------------
-            | XÓA GIỎ HÀNG
-            |--------------------------------------------------------------------------
-            */
-
-            $_SESSION['cart'] = [];
-
-            /*
-            |--------------------------------------------------------------------------
-            | CHUYỂN SANG LỊCH SỬ ĐƠN HÀNG
-            |--------------------------------------------------------------------------
-            */
-
-            header(
-                'Location: history.php?success=1&order_id=' .
-                urlencode($orderId)
+            $itemStatement = $pdo->prepare(
+                'INSERT INTO order_items (order_id, product_id, quantity, price)
+                 VALUES (:order_id, :product_id, :quantity, :price)'
+            );
+            $stockStatement = $pdo->prepare(
+                'UPDATE products
+                 SET stock = stock - :quantity_delta
+                 WHERE id = :product_id
+                   AND status = 1
+                   AND stock >= :quantity_check'
             );
 
-            exit;
+            foreach ($lockedCart['items'] as $item) {
+                $quantity = (int) $item['quantity'];
+                $productId = (int) $item['id'];
 
-        } catch (PDOException $e) {
+                $itemStatement->execute([
+                    ':order_id' => $orderId,
+                    ':product_id' => $productId,
+                    ':quantity' => $quantity,
+                    ':price' => number_format((float) $item['price'], 2, '.', ''),
+                ]);
+                $stockStatement->execute([
+                    ':quantity_delta' => $quantity,
+                    ':quantity_check' => $quantity,
+                    ':product_id' => $productId,
+                ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | ROLLBACK NẾU CÓ LỖI
-            |--------------------------------------------------------------------------
-            */
+                if ($stockStatement->rowCount() !== 1) {
+                    throw new DomainException('Tồn kho vừa thay đổi. Vui lòng kiểm tra lại giỏ hàng.');
+                }
+            }
 
+            $pdo->commit();
+            $_SESSION['cart'] = [];
+            $recentOrderIds = $_SESSION['recent_order_ids'] ?? [];
+            $recentOrderIds = is_array($recentOrderIds) ? $recentOrderIds : [];
+            $recentOrderIds[] = $orderId;
+            $_SESSION['recent_order_ids'] = array_slice(array_values(array_unique(array_map('intval', $recentOrderIds))), -20);
+
+            safe_redirect('history.php?success=1&order_id=' . $orderId, 'history.php', 303);
+        } catch (DomainException $exception) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
 
-            $error = 'Đặt hàng thất bại. Vui lòng thử lại.';
+            $error = $exception->getMessage();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            error_log('[checkout] Order failed: ' . $exception->getMessage());
+            $error = 'Đặt hàng thất bại. Vui lòng thử lại sau.';
+        }
+
+        if ($error !== '') {
+            try {
+                $cartData = load_cart($pdo);
+            } catch (PDOException $exception) {
+                error_log('[checkout] Cannot reload cart: ' . $exception->getMessage());
+            }
         }
     }
 }
-?>
 
+$items = $cartData['items'];
+$total = (float) $cartData['total'];
+$cartCount = cart_quantity_count($cartData['cart']);
+
+if ($error === '' && !$cartData['canCheckout']) {
+    $error = 'Giỏ hàng có sản phẩm ngừng bán, hết hàng hoặc vượt tồn kho. Vui lòng quay lại giỏ hàng để cập nhật.';
+}
+?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -213,31 +161,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title>Thanh toán | Fashion Shop</title>
     <link rel="stylesheet" href="../assets/css/style.css">
 </head>
-
 <body class="site-body checkout-page">
 <?php
 $siteBasePath = '../';
 $currentPage = 'cart';
 $currentCategory = 0;
-$cartCount = count($cart);
 require __DIR__ . '/../includes/header.php';
 ?>
-
 <main id="main-content">
     <section class="page-intro page-intro--compact checkout-intro">
         <div class="site-container">
             <nav class="breadcrumb" aria-label="Breadcrumb">
-                <a href="../index.php">Trang chủ</a>
-                <span aria-hidden="true">/</span>
-                <a href="index.php">Giỏ hàng</a>
-                <span aria-hidden="true">/</span>
+                <a href="../index.php">Trang chủ</a><span aria-hidden="true">/</span>
+                <a href="index.php">Giỏ hàng</a><span aria-hidden="true">/</span>
                 <span aria-current="page">Thanh toán</span>
             </nav>
-
             <div class="page-intro__content">
                 <p class="eyebrow">Secure checkout</p>
                 <h1>Thanh toán</h1>
-                <p>Hoàn tất thông tin giao hàng để xác nhận đơn hàng của bạn.</p>
+                <p>Giá và tồn kho được kiểm tra lại khi bạn xác nhận đơn hàng.</p>
             </div>
         </div>
     </section>
@@ -245,124 +187,49 @@ require __DIR__ . '/../includes/header.php';
     <section class="checkout-section" aria-label="Thông tin thanh toán">
         <div class="site-container checkout-layout">
             <div class="checkout-form-panel">
-                <div class="checkout-panel__heading">
-                    <span>01</span>
-                    <div>
-                        <p class="eyebrow">Delivery details</p>
-                        <h2>Thông tin giao hàng</h2>
-                    </div>
-                </div>
-
+                <div class="checkout-panel__heading"><span>01</span><div><p class="eyebrow">Delivery details</p><h2>Thông tin giao hàng</h2></div></div>
                 <?php if ($error !== ''): ?>
-                    <div class="form-alert" role="alert">
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <circle cx="12" cy="12" r="9"></circle>
-                            <path d="M12 7.5v5M12 16.5v.1"></path>
-                        </svg>
-                        <?= htmlspecialchars($error) ?>
-                    </div>
+                    <div class="form-alert" role="alert"><?= e($error) ?></div>
                 <?php endif; ?>
-
-                <form method="POST" class="checkout-form">
+                <form method="post" class="checkout-form" action="checkout.php">
+                    <?= csrf_field() ?>
                     <div class="form-field">
                         <label for="receiver_name">Họ và tên <span aria-hidden="true">*</span></label>
-                        <input
-                            type="text"
-                            id="receiver_name"
-                            name="receiver_name"
-                            value="<?= htmlspecialchars($_POST['receiver_name'] ?? '') ?>"
-                            autocomplete="name"
-                            placeholder="Nhập họ và tên người nhận"
-                            required
-                        >
+                        <input type="text" id="receiver_name" name="receiver_name" value="<?= e($receiverName) ?>" autocomplete="name" maxlength="100" required>
                     </div>
-
                     <div class="form-field">
                         <label for="phone">Số điện thoại <span aria-hidden="true">*</span></label>
-                        <input
-                            type="tel"
-                            id="phone"
-                            name="phone"
-                            value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>"
-                            autocomplete="tel"
-                            inputmode="tel"
-                            placeholder="Nhập số điện thoại"
-                            required
-                        >
+                        <input type="tel" id="phone" name="phone" value="<?= e($phone) ?>" autocomplete="tel" inputmode="tel" maxlength="20" required>
                     </div>
-
                     <div class="form-field">
                         <label for="address">Địa chỉ nhận hàng <span aria-hidden="true">*</span></label>
-                        <textarea
-                            id="address"
-                            name="address"
-                            autocomplete="street-address"
-                            placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
-                            required
-                        ><?= htmlspecialchars($_POST['address'] ?? '') ?></textarea>
+                        <textarea id="address" name="address" autocomplete="street-address" maxlength="255" required><?= e($address) ?></textarea>
                     </div>
-
-                    <button type="submit" class="button button--primary checkout-submit">
-                        Xác nhận đặt hàng
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5"></path></svg>
-                    </button>
+                    <button type="submit" class="button button--primary checkout-submit" <?= !$cartData['canCheckout'] ? 'disabled' : '' ?>>Xác nhận đặt hàng</button>
                 </form>
-
                 <a class="checkout-back" href="index.php">← Quay lại giỏ hàng</a>
             </div>
 
             <aside class="checkout-summary" aria-labelledby="checkout-summary-title">
-                <div class="checkout-panel__heading">
-                    <span>02</span>
-                    <div>
-                        <p class="eyebrow">Order summary</p>
-                        <h2 id="checkout-summary-title">Đơn hàng của bạn</h2>
-                    </div>
-                </div>
-
+                <div class="checkout-panel__heading"><span>02</span><div><p class="eyebrow">Order summary</p><h2 id="checkout-summary-title">Đơn hàng của bạn</h2></div></div>
                 <div class="checkout-summary__items">
-                    <?php foreach ($cart as $item): ?>
-                        <?php
-
-                        $subtotal =
-
-                            $item['price'] * $item['quantity'];
-
-                        ?>
+                    <?php foreach ($items as $item): ?>
                         <div class="checkout-item">
-                            <div>
-                                <h3><?= htmlspecialchars($item['name']) ?></h3>
-                                <span>Số lượng: <?= (int)$item['quantity'] ?></span>
-                            </div>
-                            <strong><?= number_format($subtotal, 0, ',', '.') ?>đ</strong>
+                            <div><h3><?= e($item['name']) ?></h3><span>Số lượng: <?= (int) $item['quantity'] ?></span></div>
+                            <strong><?= number_format((float) $item['subtotal'], 0, ',', '.') ?>đ</strong>
                         </div>
                     <?php endforeach; ?>
                 </div>
-
                 <div class="checkout-summary__meta">
-                    <div>
-                        <span>Tạm tính</span>
-                        <strong><?= number_format($total, 0, ',', '.') ?>đ</strong>
-                    </div>
-                    <div>
-                        <span>Phí vận chuyển</span>
-                        <strong>Tính theo địa chỉ</strong>
-                    </div>
+                    <div><span>Tạm tính</span><strong><?= number_format($total, 0, ',', '.') ?>đ</strong></div>
+                    <div><span>Phí vận chuyển</span><strong>Tính theo địa chỉ</strong></div>
                 </div>
-
-                <div class="checkout-summary__total">
-                    <span>Tổng cộng</span>
-                    <strong><?= number_format($total, 0, ',', '.') ?>đ</strong>
-                </div>
-
-                <p class="checkout-summary__note">
-                    Thông tin đơn hàng sẽ được xác nhận sau khi bạn hoàn tất đặt hàng.
-                </p>
+                <div class="checkout-summary__total"><span>Tổng cộng</span><strong><?= number_format($total, 0, ',', '.') ?>đ</strong></div>
+                <p class="checkout-summary__note">Không có tổng tiền nào từ trình duyệt được dùng để tạo đơn.</p>
             </aside>
         </div>
     </section>
 </main>
-
 <?php require __DIR__ . '/../includes/footer.php'; ?>
 <script src="../assets/js/main.js" defer></script>
 </body>

@@ -1,14 +1,20 @@
 <?php
 
 require_once __DIR__ . "/../../includes/db.php";
+require_once __DIR__ . "/../../includes/auth.php";
+require_once __DIR__ . "/../../includes/admin_helpers.php";
+
+require_admin(app_url('auth/login.php'));
 
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $name = trim($_POST['name'] ?? '');
+    $name = sanitize_text($_POST['name'] ?? '', 100);
 
-    if ($name === '') {
+    if (!csrf_validate(is_string($_POST['_csrf_token'] ?? null) ? $_POST['_csrf_token'] : null)) {
+        $error = "Phiên thao tác đã hết hạn. Vui lòng thử lại.";
+    } elseif ($name === '' || mb_strlen($name, 'UTF-8') < 2) {
 
         $error = "Vui lòng nhập tên danh mục.";
 
@@ -17,18 +23,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
 
             $stmt = $pdo->prepare("
-                INSERT INTO categories (name)
-                VALUES (?)
+                INSERT INTO categories (name, slug)
+                VALUES (?, ?)
             ");
 
-            $stmt->execute([$name]);
+            $slug = admin_unique_slug($pdo, 'categories', $name);
+            $stmt->execute([$name, $slug]);
 
             header("Location: index.php");
             exit;
 
         } catch (PDOException $e) {
 
-            $error = $e->getMessage();
+            error_log('[admin-category-create] Insert failed: ' . $e->getMessage());
+            $error = 'Không thể tạo danh mục. Vui lòng kiểm tra tên và thử lại.';
 
         }
 
@@ -150,6 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <form method="POST">
 
+                <?= csrf_field() ?>
+
                 <label>
                     Tên danh mục
                 </label>
@@ -157,6 +167,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input
                     type="text"
                     name="name"
+                    value="<?= e($name ?? '') ?>"
+                    maxlength="100"
                     placeholder="Ví dụ: Áo"
                     required
                 >

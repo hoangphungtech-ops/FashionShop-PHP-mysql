@@ -2,7 +2,25 @@
 $siteBasePath = $siteBasePath ?? '';
 $currentPage = $currentPage ?? '';
 $currentCategory = $currentCategory ?? 0;
-$cartCount = $cartCount ?? 0;
+if (!isset($cartCount)) {
+    $cartCount = 0;
+    $headerCart = $_SESSION['cart'] ?? [];
+
+    if (is_array($headerCart)) {
+        foreach ($headerCart as $headerCartValue) {
+            $headerQuantityValue = is_array($headerCartValue)
+                ? ($headerCartValue['quantity'] ?? 0)
+                : $headerCartValue;
+            $headerQuantity = filter_var($headerQuantityValue, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1],
+            ]);
+
+            if ($headerQuantity !== false) {
+                $cartCount += (int) $headerQuantity;
+            }
+        }
+    }
+}
 ?>
 
 <a class="skip-link" href="#main-content">Bỏ qua điều hướng</a>

@@ -1,9 +1,8 @@
 <?php
 require_once __DIR__ . "/../includes/db.php";
+require_once __DIR__ . "/../includes/auth.php";
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_admin(app_url('auth/login.php'));
 
 $productCount = 0;
 $categoryCount = 0;
@@ -14,7 +13,8 @@ try {
     $categoryCount = $pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn();
     $orderCount = $pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
 } catch (PDOException $e) {
-    $error = $e->getMessage();
+    error_log('[admin-dashboard] Cannot load counters: ' . $e->getMessage());
+    $error = 'Chưa thể tải số liệu dashboard.';
 }
 ?>
 

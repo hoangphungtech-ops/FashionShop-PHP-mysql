@@ -1,79 +1,40 @@
 <?php
 
-require_once __DIR__ . "/../includes/db.php";
+declare(strict_types=1);
 
-/* =========================
-   LẤY CATEGORY
-========================= */
+require_once __DIR__ . '/../includes/db.php';
 
-$category = isset($_GET['category'])
-    ? (int) $_GET['category']
-    : 0;
+function catalogStringInput(string $key, int $maxLength = 100): string
+{
+    $value = $_GET[$key] ?? '';
 
-$category = in_array($category, [0, 1, 2, 3], true) ? $category : 0;
-$gender = isset($_GET['gender']) ? strtolower(trim((string)$_GET['gender'])) : '';
-$gender = in_array($gender, ['nam', 'nu'], true) ? $gender : '';
-
-
-/* =========================
-   LẤY SẢN PHẨM
-========================= */
-
-$products = [];
-
-try {
-    $conditions = ['products.status = 1'];
-    $parameters = [];
-
-    if ($category > 0) {
-        $conditions[] = 'products.category_id = :category';
-        $parameters[':category'] = $category;
+    if (!is_string($value)) {
+        return '';
     }
 
-    if ($gender !== '') {
-        $conditions[] = 'products.name LIKE :gender';
-        $parameters[':gender'] = $gender === 'nu' ? '%nữ%' : '%nam%';
+    $value = trim(str_replace("\0", '', $value));
+
+    return function_exists('mb_substr')
+        ? mb_substr($value, 0, $maxLength, 'UTF-8')
+        : substr($value, 0, $maxLength);
+}
+
+function catalogPriceInput(string $key): ?float
+{
+    $value = $_GET[$key] ?? null;
+
+    if (!is_string($value) || trim($value) === '') {
+        return null;
     }
 
-    $sql = "SELECT products.*, categories.name AS category_name
-            FROM products
-            LEFT JOIN categories ON categories.id = products.category_id
-            WHERE " . implode(' AND ', $conditions) . "
-            ORDER BY products.id DESC";
+    $price = filter_var($value, FILTER_VALIDATE_FLOAT);
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($parameters);
-
-    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-
-    die("Lỗi lấy sản phẩm: " . $e->getMessage());
-
+    return $price !== false && $price >= 0 && $price <= 999999999999
+        ? (float) $price
+        : null;
 }
 
-$categoryNames = [1 => 'Áo', 2 => 'Quần', 3 => 'Váy'];
-$genderLabel = $gender === 'nu' ? 'Nữ' : ($gender === 'nam' ? 'Nam' : '');
-
-if ($category > 0 && $genderLabel !== '') {
-    $pageHeading = $categoryNames[$category] . ' ' . $genderLabel;
-} elseif ($category > 0) {
-    $pageHeading = $categoryNames[$category];
-} elseif ($genderLabel !== '') {
-    $pageHeading = 'Thời trang ' . $genderLabel;
-} else {
-    $pageHeading = 'Tất cả sản phẩm';
-}
-
-$categoryGenderQuery = $gender !== '' ? '&gender=' . rawurlencode($gender) : '';
-
-
-/* =========================
-   LẤY ẢNH SẢN PHẨM
-   MỖI SẢN PHẨM CHỈ 1 ẢNH
-========================= */
-
-function getProductImage($image)
+function getProductImage(mixed $image): string
 {
     $image = trim((string)($image ?? ''));
 
@@ -111,6 +72,178 @@ function getProductImage($image)
     // Ảnh mặc định
     return '../assets/images/ao-thun.jpg';
 }
+
+$search = catalogStringInput('q');
+$gender = strtolower(catalogStringInput('gender', 10));
+$gender = in_array($gender, ['nam', 'nu'], true) ? $gender : '';
+$sort = catalogStringInput('sort', 20);
+
+$sortOptions = [
+    'newest' => 'Mới nhất',
+    'price_asc' => 'Giá tăng dần',
+    'price_desc' => 'Giá giảm dần',
+];
+
+if (!isset($sortOptions[$sort])) {
+    $sort = 'newest';
+}
+
+$minPrice = catalogPriceInput('min_price');
+$maxPrice = catalogPriceInput('max_price');
+
+if ($minPrice !== null && $maxPrice !== null && $minPrice > $maxPrice) {
+    [$minPrice, $maxPrice] = [$maxPrice, $minPrice];
+}
+
+$categoryInput = $_GET['category'] ?? null;
+$requestedCategory = is_string($categoryInput) || is_int($categoryInput)
+    ? filter_var($categoryInput, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1],
+    ])
+    : false;
+$pageInput = $_GET['page'] ?? 1;
+$requestedPage = is_string($pageInput) || is_int($pageInput)
+    ? filter_var($pageInput, FILTER_VALIDATE_INT, [
+        'options' => ['min_range' => 1],
+    ])
+    : false;
+$page = $requestedPage !== false ? (int) $requestedPage : 1;
+
+$products = [];
+$categories = [];
+$categoryNames = [];
+$category = 0;
+$totalProducts = 0;
+$totalPages = 1;
+$perPage = 9;
+$catalogError = '';
+
+$orderBy = [
+    'newest' => 'products.created_at DESC, products.id DESC',
+    'price_asc' => 'products.price ASC, products.id DESC',
+    'price_desc' => 'products.price DESC, products.id DESC',
+][$sort];
+
+try {
+    $categoryStatement = $pdo->prepare(
+        'SELECT id, name FROM categories ORDER BY name ASC'
+    );
+    $categoryStatement->execute();
+    $categories = $categoryStatement->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($categories as $categoryRow) {
+        $categoryNames[(int) $categoryRow['id']] = (string) $categoryRow['name'];
+    }
+
+    if ($requestedCategory !== false && isset($categoryNames[(int) $requestedCategory])) {
+        $category = (int) $requestedCategory;
+    }
+
+    $conditions = ['products.status = :active_status'];
+    $parameters = [':active_status' => 1];
+
+    if ($search !== '') {
+        $conditions[] = 'products.name LIKE :search';
+        $parameters[':search'] = '%' . $search . '%';
+    }
+
+    if ($category > 0) {
+        $conditions[] = 'products.category_id = :category_id';
+        $parameters[':category_id'] = $category;
+    }
+
+    if ($gender !== '') {
+        $conditions[] = 'products.name LIKE :gender_keyword';
+        $parameters[':gender_keyword'] = $gender === 'nu' ? '%nữ%' : '%nam%';
+    }
+
+    if ($minPrice !== null) {
+        $conditions[] = 'products.price >= :min_price';
+        $parameters[':min_price'] = $minPrice;
+    }
+
+    if ($maxPrice !== null) {
+        $conditions[] = 'products.price <= :max_price';
+        $parameters[':max_price'] = $maxPrice;
+    }
+
+    $whereClause = implode(' AND ', $conditions);
+    $countStatement = $pdo->prepare(
+        "SELECT COUNT(*) FROM products WHERE {$whereClause}"
+    );
+    $countStatement->execute($parameters);
+    $totalProducts = (int) $countStatement->fetchColumn();
+    $totalPages = max(1, (int) ceil($totalProducts / $perPage));
+    $page = min($page, $totalPages);
+    $offset = ($page - 1) * $perPage;
+
+    $productStatement = $pdo->prepare(
+        "SELECT products.id,
+                products.category_id,
+                products.name,
+                products.price,
+                products.image,
+                products.created_at,
+                categories.name AS category_name
+         FROM products
+         LEFT JOIN categories ON categories.id = products.category_id
+         WHERE {$whereClause}
+         ORDER BY {$orderBy}
+         LIMIT {$perPage} OFFSET {$offset}"
+    );
+    $productStatement->execute($parameters);
+    $products = $productStatement->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $exception) {
+    error_log('[catalog] Cannot load products: ' . $exception->getMessage());
+    http_response_code(500);
+    $catalogError = 'Không thể tải danh sách sản phẩm lúc này. Vui lòng thử lại sau.';
+}
+
+$genderLabel = $gender === 'nu' ? 'Nữ' : ($gender === 'nam' ? 'Nam' : '');
+
+if ($search !== '') {
+    $pageHeading = 'Kết quả tìm kiếm';
+} elseif ($category > 0 && $genderLabel !== '') {
+    $pageHeading = $categoryNames[$category] . ' ' . $genderLabel;
+} elseif ($category > 0) {
+    $pageHeading = $categoryNames[$category];
+} elseif ($genderLabel !== '') {
+    $pageHeading = 'Thời trang ' . $genderLabel;
+} else {
+    $pageHeading = 'Tất cả sản phẩm';
+}
+
+$queryState = [
+    'q' => $search,
+    'category' => $category > 0 ? $category : null,
+    'gender' => $gender,
+    'min_price' => $minPrice !== null ? (string) (int) $minPrice : null,
+    'max_price' => $maxPrice !== null ? (string) (int) $maxPrice : null,
+    'sort' => $sort !== 'newest' ? $sort : null,
+];
+$hasActiveFilters = $search !== ''
+    || $category > 0
+    || $gender !== ''
+    || $minPrice !== null
+    || $maxPrice !== null
+    || $sort !== 'newest';
+
+$buildCatalogUrl = static function (array $overrides = []) use ($queryState): string {
+    $parameters = array_merge($queryState, $overrides);
+
+    foreach ($parameters as $key => $value) {
+        if ($value === null || $value === '' || ($key === 'page' && (int) $value <= 1)) {
+            unset($parameters[$key]);
+        }
+    }
+
+    $query = http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
+
+    return 'index.php' . ($query !== '' ? '?' . $query : '');
+};
+
+$firstVisibleProduct = $totalProducts > 0 ? (($page - 1) * $perPage) + 1 : 0;
+$lastVisibleProduct = min($page * $perPage, $totalProducts);
 ?>
 
 <!DOCTYPE html>
@@ -146,7 +279,7 @@ function getProductImage($image)
 
         .products-page-header {
             text-align: center;
-            margin-bottom: 45px;
+            margin-bottom: 30px;
         }
 
         .products-page-header .small-title {
@@ -181,7 +314,124 @@ function getProductImage($image)
 
 
         /* =========================
-           CATEGORY
+           SEARCH / FILTER / SORT
+        ========================= */
+
+        .catalog-toolbar {
+            margin-bottom: 22px;
+            padding: 22px;
+            border: 1px solid #e1e7e1;
+            background: #f8faf8;
+        }
+
+        .catalog-filter {
+            display: grid;
+            grid-template-columns: minmax(240px, 2fr) repeat(5, minmax(110px, 1fr)) auto;
+            gap: 14px;
+            align-items: end;
+        }
+
+        .catalog-filter__field {
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .catalog-filter__field label {
+            color: #526054;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .catalog-filter__field input,
+        .catalog-filter__field select {
+            width: 100%;
+            min-height: 44px;
+            padding: 10px 12px;
+            border: 1px solid #d6ded7;
+            border-radius: 0;
+            outline: none;
+            background: #ffffff;
+            color: #263126;
+            font: inherit;
+            font-size: 14px;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+
+        .catalog-filter__field input:focus,
+        .catalog-filter__field select:focus {
+            border-color: #708474;
+            box-shadow: 0 0 0 3px rgba(112, 132, 116, .13);
+        }
+
+        .catalog-filter__actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .catalog-filter__submit,
+        .catalog-filter__clear {
+            display: inline-flex;
+            min-height: 44px;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 17px;
+            border: 1px solid #263126;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+        }
+
+        .catalog-filter__submit {
+            background: #263126;
+            color: #ffffff;
+        }
+
+        .catalog-filter__submit:hover,
+        .catalog-filter__submit:focus-visible {
+            background: #526c5c;
+            border-color: #526c5c;
+        }
+
+        .catalog-filter__clear {
+            border-color: #d6ded7;
+            background: #ffffff;
+            color: #526054;
+        }
+
+        .catalog-filter__clear:hover,
+        .catalog-filter__clear:focus-visible {
+            border-color: #263126;
+            color: #263126;
+        }
+
+        .catalog-results-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 18px 0 24px;
+            color: #667066;
+            font-size: 14px;
+        }
+
+        .catalog-results-summary strong {
+            color: #263126;
+        }
+
+        .catalog-results-summary a {
+            color: #526c5c;
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+
+        /* =========================
+           CATEGORY SHORTCUTS
         ========================= */
 
         .category-filter {
@@ -190,7 +440,7 @@ function getProductImage($image)
             align-items: center;
             flex-wrap: wrap;
             gap: 12px;
-            margin-bottom: 45px;
+            margin-bottom: 0;
         }
 
         .category-filter a {
@@ -213,6 +463,11 @@ function getProductImage($image)
             background: #263126;
             color: #ffffff;
             border-color: #263126;
+        }
+
+        .category-filter a:focus-visible {
+            outline: 3px solid rgba(112, 132, 116, .25);
+            outline-offset: 2px;
         }
 
 
@@ -388,6 +643,61 @@ function getProductImage($image)
             color: #788078;
         }
 
+        .products-empty a {
+            display: inline-flex;
+            margin-top: 22px;
+            padding: 11px 18px;
+            background: #263126;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .products-empty--error {
+            border-color: #dfc5c2;
+            background: #fff8f7;
+        }
+
+
+        /* =========================
+           PAGINATION
+        ========================= */
+
+        .catalog-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 38px;
+        }
+
+        .catalog-pagination a,
+        .catalog-pagination span {
+            display: inline-flex;
+            min-width: 42px;
+            min-height: 42px;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            border: 1px solid #dfe6df;
+            color: #526054;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .catalog-pagination a:hover,
+        .catalog-pagination a:focus-visible,
+        .catalog-pagination .is-current {
+            border-color: #263126;
+            background: #263126;
+            color: #ffffff;
+        }
+
+        .catalog-pagination .is-disabled {
+            opacity: .45;
+        }
+
 
         /* =========================
            FOOTER
@@ -465,6 +775,15 @@ function getProductImage($image)
 
         @media (max-width: 900px) {
 
+            .catalog-filter {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .catalog-filter__field--search,
+            .catalog-filter__actions {
+                grid-column: 1 / -1;
+            }
+
             .products-page .product-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -484,6 +803,40 @@ function getProductImage($image)
 
             .products-page-header h1 {
                 font-size: 36px;
+            }
+
+            .catalog-toolbar {
+                padding: 16px;
+            }
+
+            .catalog-filter {
+                grid-template-columns: 1fr;
+            }
+
+            .catalog-filter__field--search,
+            .catalog-filter__actions {
+                grid-column: auto;
+            }
+
+            .catalog-filter__actions {
+                flex-direction: column;
+            }
+
+            .catalog-results-summary {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .category-filter {
+                justify-content: flex-start;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 4px;
+            }
+
+            .category-filter a {
+                flex: 0 0 auto;
             }
 
             .products-page .product-grid {
@@ -603,7 +956,7 @@ function getProductImage($image)
             </p>
 
             <p class="products-page-count">
-                <?= count($products) ?> thiết kế
+                <?= number_format($totalProducts, 0, ',', '.') ?> sản phẩm được tìm thấy
             </p>
 
         </div>
@@ -611,58 +964,123 @@ function getProductImage($image)
 
 
         <!-- =========================
-             CATEGORY FILTER
+             SEARCH / FILTER / SORT
         ========================= -->
 
-        <div class="category-filter">
+        <div class="catalog-toolbar">
+            <form class="catalog-filter" action="index.php" method="get" role="search">
+                <div class="catalog-filter__field catalog-filter__field--search">
+                    <label for="catalog-search">Tìm theo tên sản phẩm</label>
+                    <input
+                        id="catalog-search"
+                        name="q"
+                        type="search"
+                        value="<?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?>"
+                        placeholder="Ví dụ: áo khoác, quần jean..."
+                        maxlength="100"
+                    >
+                </div>
 
+                <div class="catalog-filter__field">
+                    <label for="catalog-category">Danh mục</label>
+                    <select id="catalog-category" name="category">
+                        <option value="">Tất cả</option>
+                        <?php foreach ($categories as $categoryOption): ?>
+                            <?php $categoryOptionId = (int) $categoryOption['id']; ?>
+                            <option
+                                value="<?= $categoryOptionId ?>"
+                                <?= $category === $categoryOptionId ? 'selected' : '' ?>
+                            >
+                                <?= htmlspecialchars((string) $categoryOption['name'], ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="catalog-filter__field">
+                    <label for="catalog-gender">Phong cách</label>
+                    <select id="catalog-gender" name="gender">
+                        <option value="">Nam &amp; Nữ</option>
+                        <option value="nam" <?= $gender === 'nam' ? 'selected' : '' ?>>Nam</option>
+                        <option value="nu" <?= $gender === 'nu' ? 'selected' : '' ?>>Nữ</option>
+                    </select>
+                </div>
+
+                <div class="catalog-filter__field">
+                    <label for="catalog-min-price">Giá từ</label>
+                    <input
+                        id="catalog-min-price"
+                        name="min_price"
+                        type="number"
+                        value="<?= $minPrice !== null ? (int) $minPrice : '' ?>"
+                        min="0"
+                        step="1000"
+                        placeholder="0đ"
+                    >
+                </div>
+
+                <div class="catalog-filter__field">
+                    <label for="catalog-max-price">Giá đến</label>
+                    <input
+                        id="catalog-max-price"
+                        name="max_price"
+                        type="number"
+                        value="<?= $maxPrice !== null ? (int) $maxPrice : '' ?>"
+                        min="0"
+                        step="1000"
+                        placeholder="1.000.000đ"
+                    >
+                </div>
+
+                <div class="catalog-filter__field">
+                    <label for="catalog-sort">Sắp xếp</label>
+                    <select id="catalog-sort" name="sort">
+                        <?php foreach ($sortOptions as $sortValue => $sortLabel): ?>
+                            <option value="<?= $sortValue ?>" <?= $sort === $sortValue ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($sortLabel, ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="catalog-filter__actions">
+                    <button class="catalog-filter__submit" type="submit">Áp dụng</button>
+                    <?php if ($hasActiveFilters): ?>
+                        <a class="catalog-filter__clear" href="index.php">Đặt lại</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+
+        <div class="category-filter" aria-label="Lọc nhanh theo danh mục">
             <a
-                href="index.php"
-                class="<?= $category === 0 && $gender === '' ? 'active' : '' ?>"
-            >
-                Tất cả
-            </a>
+                href="<?= htmlspecialchars($buildCatalogUrl(['category' => null, 'page' => null]), ENT_QUOTES, 'UTF-8') ?>"
+                class="<?= $category === 0 ? 'active' : '' ?>"
+                <?= $category === 0 ? 'aria-current="page"' : '' ?>
+            >Tất cả danh mục</a>
 
+            <?php foreach ($categories as $categoryShortcut): ?>
+                <?php $categoryShortcutId = (int) $categoryShortcut['id']; ?>
+                <a
+                    href="<?= htmlspecialchars($buildCatalogUrl(['category' => $categoryShortcutId, 'page' => null]), ENT_QUOTES, 'UTF-8') ?>"
+                    class="<?= $category === $categoryShortcutId ? 'active' : '' ?>"
+                    <?= $category === $categoryShortcutId ? 'aria-current="page"' : '' ?>
+                ><?= htmlspecialchars((string) $categoryShortcut['name'], ENT_QUOTES, 'UTF-8') ?></a>
+            <?php endforeach; ?>
+        </div>
 
-            <a
-                href="index.php?gender=nam"
-                class="<?= $gender === 'nam' && $category === 0 ? 'active' : '' ?>"
-            >
-                Nam
-            </a>
+        <div class="catalog-results-summary">
+            <p>
+                Hiển thị <strong><?= $firstVisibleProduct ?>–<?= $lastVisibleProduct ?></strong>
+                trong <strong><?= number_format($totalProducts, 0, ',', '.') ?></strong> sản phẩm
+                <?php if ($search !== ''): ?>
+                    cho “<strong><?= htmlspecialchars($search, ENT_QUOTES, 'UTF-8') ?></strong>”
+                <?php endif; ?>
+            </p>
 
-
-            <a
-                href="index.php?gender=nu"
-                class="<?= $gender === 'nu' && $category === 0 ? 'active' : '' ?>"
-            >
-                Nữ
-            </a>
-
-
-            <a
-                href="index.php?category=1<?= htmlspecialchars($categoryGenderQuery) ?>"
-                class="<?= $category === 1 ? 'active' : '' ?>"
-            >
-                Áo
-            </a>
-
-
-            <a
-                href="index.php?category=2<?= htmlspecialchars($categoryGenderQuery) ?>"
-                class="<?= $category === 2 ? 'active' : '' ?>"
-            >
-                Quần
-            </a>
-
-
-            <a
-                href="index.php?category=3<?= htmlspecialchars($categoryGenderQuery) ?>"
-                class="<?= $category === 3 ? 'active' : '' ?>"
-            >
-                Váy
-            </a>
-
+            <?php if ($hasActiveFilters): ?>
+                <a href="index.php">Xóa tất cả bộ lọc</a>
+            <?php endif; ?>
         </div>
 
 
@@ -688,6 +1106,8 @@ function getProductImage($image)
                         ? 'NỮ'
                         : (preg_match('/(^|\s)nam($|\s)/iu', $productName) ? 'NAM' : 'UNISEX');
                     $productCategory = (string)($product['category_name'] ?? 'THỜI TRANG');
+                    $createdTimestamp = strtotime((string) ($product['created_at'] ?? ''));
+                    $isNew = $createdTimestamp !== false && $createdTimestamp >= strtotime('-30 days');
 
                     ?>
 
@@ -700,9 +1120,9 @@ function getProductImage($image)
                             class="product-image"
                         >
 
-                            <span class="new">
-                                NEW
-                            </span>
+                            <?php if ($isNew): ?>
+                                <span class="new">NEW</span>
+                            <?php endif; ?>
 
 
                             <img
@@ -710,6 +1130,8 @@ function getProductImage($image)
                                 alt="<?= htmlspecialchars(
                                     $product['name'] ?? 'Sản phẩm'
                                 ) ?>"
+                                loading="lazy"
+                                decoding="async"
                             >
 
                         </a>
@@ -762,19 +1184,34 @@ function getProductImage($image)
                 <?php endforeach; ?>
 
 
+            <?php elseif ($catalogError !== ''): ?>
+
+
+                <div class="products-empty products-empty--error" role="alert">
+
+                    <h3>Chưa thể tải sản phẩm</h3>
+
+                    <p><?= htmlspecialchars($catalogError, ENT_QUOTES, 'UTF-8') ?></p>
+
+                    <a href="index.php">Thử lại</a>
+
+                </div>
+
+
             <?php else: ?>
 
 
                 <div class="products-empty">
 
                     <h3>
-                        Chưa có sản phẩm
+                        Không tìm thấy sản phẩm
                     </h3>
 
                     <p>
-                        Hiện tại chưa có sản phẩm
-                        phù hợp để hiển thị.
+                        Hãy thử từ khóa khác hoặc điều chỉnh bộ lọc của bạn.
                     </p>
+
+                    <a href="index.php">Xóa bộ lọc</a>
 
                 </div>
 
@@ -783,6 +1220,54 @@ function getProductImage($image)
 
 
         </div>
+
+        <?php if ($catalogError === '' && $totalPages > 1): ?>
+            <?php
+            $paginationPages = [1, $totalPages];
+
+            for ($paginationPage = max(1, $page - 2); $paginationPage <= min($totalPages, $page + 2); $paginationPage++) {
+                $paginationPages[] = $paginationPage;
+            }
+
+            $paginationPages = array_values(array_unique($paginationPages));
+            sort($paginationPages);
+            $previousPaginationPage = 0;
+            ?>
+
+            <nav class="catalog-pagination" aria-label="Phân trang sản phẩm">
+                <?php if ($page > 1): ?>
+                    <a href="<?= htmlspecialchars($buildCatalogUrl(['page' => $page - 1]), ENT_QUOTES, 'UTF-8') ?>" rel="prev">
+                        Trước
+                    </a>
+                <?php else: ?>
+                    <span class="is-disabled" aria-disabled="true">Trước</span>
+                <?php endif; ?>
+
+                <?php foreach ($paginationPages as $paginationPage): ?>
+                    <?php if ($previousPaginationPage > 0 && $paginationPage > $previousPaginationPage + 1): ?>
+                        <span class="is-disabled" aria-hidden="true">…</span>
+                    <?php endif; ?>
+
+                    <?php if ($paginationPage === $page): ?>
+                        <span class="is-current" aria-current="page"><?= $paginationPage ?></span>
+                    <?php else: ?>
+                        <a href="<?= htmlspecialchars($buildCatalogUrl(['page' => $paginationPage]), ENT_QUOTES, 'UTF-8') ?>">
+                            <?= $paginationPage ?>
+                        </a>
+                    <?php endif; ?>
+
+                    <?php $previousPaginationPage = $paginationPage; ?>
+                <?php endforeach; ?>
+
+                <?php if ($page < $totalPages): ?>
+                    <a href="<?= htmlspecialchars($buildCatalogUrl(['page' => $page + 1]), ENT_QUOTES, 'UTF-8') ?>" rel="next">
+                        Sau
+                    </a>
+                <?php else: ?>
+                    <span class="is-disabled" aria-disabled="true">Sau</span>
+                <?php endif; ?>
+            </nav>
+        <?php endif; ?>
 
 
     </div>

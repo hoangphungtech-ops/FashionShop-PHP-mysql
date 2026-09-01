@@ -1,5 +1,9 @@
 <?php
 require_once __DIR__ . "/../../includes/db.php";
+require_once __DIR__ . "/../../includes/auth.php";
+require_once __DIR__ . "/../../includes/admin_helpers.php";
+
+require_admin(app_url('auth/login.php'));
 
 $stmt = $pdo->query("
     SELECT p.*, c.name AS category_name
@@ -9,6 +13,7 @@ $stmt = $pdo->query("
 ");
 
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$flash = pull_admin_flash();
 ?>
 
 <!DOCTYPE html>
@@ -116,8 +121,14 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         .delete {
             color: #a34d4d;
-            text-decoration: none;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+            text-decoration: underline;
         }
+
+        .delete-form { display: inline; }
+        .notice { padding: 12px 15px; margin-bottom: 18px; background: #edf6f0; color: #28553f; }
 
         .status {
             padding: 5px 9px;
@@ -156,6 +167,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </header>
 
 <div class="container content">
+
+    <?php if ($flash !== null): ?>
+        <div class="notice" role="status"><?= e($flash['message'] ?? '') ?></div>
+    <?php endif; ?>
 
     <div class="top">
 
@@ -199,18 +214,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <td>
 
-                        <?php
-                        $image = $product['image'] ?? '';
-
-                        if ($image === '') {
-                            $image = 'assets/images/.gitkeep';
-                        }
-                        ?>
-
                         <img
-                            src="../../<?= htmlspecialchars($image) ?>"
+                            src="<?= e(admin_product_image_url($product['image'] ?? '')) ?>"
                             class="product-img"
-                            alt=""
+                            alt="<?= e($product['name']) ?>"
                         >
 
                     </td>
@@ -261,13 +268,11 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             Sửa
                         </a>
 
-                        <a
-                            href="delete.php?id=<?= (int)$product['id'] ?>"
-                            class="delete"
-                            onclick="return confirm('Bạn có chắc muốn xóa sản phẩm này?')"
-                        >
-                            Xóa
-                        </a>
+                        <form class="delete-form" method="post" action="delete.php" onsubmit="return confirm('Bạn có chắc muốn xóa sản phẩm này?')">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="id" value="<?= (int) $product['id'] ?>">
+                            <button type="submit" class="delete">Xóa</button>
+                        </form>
                         </td>
 
                 </tr>

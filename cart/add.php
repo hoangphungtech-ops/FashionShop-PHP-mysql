@@ -1,104 +1,141 @@
 <?php
 
-require_once __DIR__ . "/../includes/db.php";
+declare(strict_types=1);
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__ . '/../includes/db.php';
+
+function redirectAfterCartAdd(string $type, string $message, string $returnUrl): never
+{
+    $_SESSION['cart_flash'] = [
+        'type' => in_array($type, ['success', 'error'], true) ? $type : 'error',
+        'message' => $message,
+    ];
+
+    safe_redirect($returnUrl, '../products/index.php', 303);
 }
 
+if (!is_post_request()) {
+    http_response_code(405);
+    header('Allow: POST');
+    header('Content-Type: text/html; charset=UTF-8');
 
-/* =========================
-   KIỂM TRA ID
-========================= */
-
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    header("Location: ../products/index.php");
+    echo '<!doctype html><html lang="vi"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<title>Yêu cầu không hợp lệ</title></head><body>'
+        . '<main style="max-width:640px;margin:70px auto;padding:24px;font-family:Arial,sans-serif">'
+        . '<h1>Yêu cầu không hợp lệ</h1>'
+        . '<p>Vui lòng thêm sản phẩm từ trang chi tiết sản phẩm.</p>'
+        . '<a href="../products/index.php">Quay lại sản phẩm</a>'
+        . '</main></body></html>';
     exit;
 }
 
-$id = (int) $_GET['id'];
+$returnUrlInput = $_POST['return_url'] ?? '';
+$returnUrl = is_string($returnUrlInput) && is_safe_redirect_target($returnUrlInput)
+    ? $returnUrlInput
+    : '../products/index.php';
+$csrfToken = $_POST['_csrf_token'] ?? null;
 
+if (!is_string($csrfToken) || !csrf_validate($csrfToken)) {
+    redirectAfterCartAdd(
+        'error',
+        'Phiên thêm vào giỏ đã hết hạn. Vui lòng thử lại.',
+        $returnUrl
+    );
+}
 
-/* =========================
-   LẤY SẢN PHẨM
-========================= */
+$productId = input_int($_POST, 'product_id');
+$requestedQuantity = input_int($_POST, 'quantity', 1, 9999);
+
+if ($productId === null || $requestedQuantity === null) {
+    redirectAfterCartAdd(
+        'error',
+        'Sản phẩm hoặc số lượng không hợp lệ.',
+        $returnUrl
+    );
+}
 
 try {
-
-    $sql = "SELECT *
-            FROM products
-            WHERE id = :id
-            AND status = 1
-            LIMIT 1";
-
-    $stmt = $pdo->prepare($sql);
-
-    $stmt->execute([
-        ':id' => $id
+    $productStatement = $pdo->prepare(
+        'SELECT id, name, stock
+         FROM products
+         WHERE id = :id
+           AND status = :active_status
+         LIMIT 1'
+    );
+    $productStatement->execute([
+        ':id' => $productId,
+        ':active_status' => 1,
     ]);
+    $product = $productStatement->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (PDOException $exception) {
+    error_log('[cart-add] Cannot load product: ' . $exception->getMessage());
 
-    $product = $stmt->fetch(PDO::FETCH_ASSOC);
-
-} catch (PDOException $e) {
-
-    die("Lỗi database: " . $e->getMessage());
-
+    redirectAfterCartAdd(
+        'error',
+        'Không thể thêm sản phẩm lúc này. Vui lòng thử lại sau.',
+        $returnUrl
+    );
 }
 
-
-/* =========================
-   KIỂM TRA SẢN PHẨM
-========================= */
-
-if (!$product) {
-    die("Không tìm thấy sản phẩm.");
+if ($product === null) {
+    redirectAfterCartAdd(
+        'error',
+        'Sản phẩm không tồn tại hoặc đã ngừng bán.',
+        $returnUrl
+    );
 }
 
+$stock = max(0, (int) ($product['stock'] ?? 0));
 
-/* =========================
-   KIỂM TRA TỒN KHO
-========================= */
-
-if ((int)$product['stock'] <= 0) {
-    die("Sản phẩm đã hết hàng.");
+if ($stock < 1) {
+    redirectAfterCartAdd(
+        'error',
+        'Sản phẩm đã hết hàng.',
+        $returnUrl
+    );
 }
 
-
-/* =========================
-   TẠO GIỎ HÀNG
-========================= */
-
-if (!isset($_SESSION['cart'])) {
-    $_SESSION['cart'] = [];
+if ($requestedQuantity > $stock) {
+    redirectAfterCartAdd(
+        'error',
+        'Số lượng yêu cầu vượt quá tồn kho hiện có.',
+        $returnUrl
+    );
 }
 
+$cart = $_SESSION['cart'] ?? [];
 
-/* =========================
-   THÊM SẢN PHẨM
-========================= */
-
-if (isset($_SESSION['cart'][$id])) {
-
-    $quantity = (int) $_SESSION['cart'][$id];
-
-    if ($quantity < (int)$product['stock']) {
-
-        $_SESSION['cart'][$id] = $quantity + 1;
-
-    }
-
-} else {
-
-    $_SESSION['cart'][$id] = 1;
-
+if (!is_array($cart)) {
+    $cart = [];
 }
 
+$currentQuantityValue = $cart[$productId] ?? 0;
+$currentQuantity = filter_var($currentQuantityValue, FILTER_VALIDATE_INT, [
+    'options' => ['min_range' => 1],
+]);
+$currentQuantity = $currentQuantity !== false ? (int) $currentQuantity : 0;
+$newQuantity = $currentQuantity + $requestedQuantity;
 
-/* =========================
-   ĐI ĐẾN GIỎ HÀNG
-========================= */
+if ($newQuantity > $stock) {
+    redirectAfterCartAdd(
+        'error',
+        'Tổng số lượng trong giỏ vượt quá tồn kho. Hiện bạn đã có '
+        . $currentQuantity
+        . ' sản phẩm này trong giỏ.',
+        $returnUrl
+    );
+}
 
-header("Location: index.php");
-exit;
+$cart[$productId] = $newQuantity;
+$_SESSION['cart'] = $cart;
 
-?>
+redirectAfterCartAdd(
+    'success',
+    'Đã thêm '
+    . $requestedQuantity
+    . ' × '
+    . (string) $product['name']
+    . ' vào giỏ hàng.',
+    $returnUrl
+);

@@ -93,4 +93,49 @@
             });
         });
     });
+
+    document.querySelectorAll("[data-quantity-control]").forEach((control) => {
+        const input = control.querySelector("[data-quantity-input]");
+        const decreaseButton = control.querySelector("[data-quantity-decrease]");
+        const increaseButton = control.querySelector("[data-quantity-increase]");
+
+        if (!input || !decreaseButton || !increaseButton) {
+            return;
+        }
+
+        if (input.disabled) {
+            decreaseButton.disabled = true;
+            increaseButton.disabled = true;
+            return;
+        }
+
+        const minimum = Math.max(1, Number.parseInt(input.min || "1", 10));
+        const parsedMaximum = Number.parseInt(input.max || String(minimum), 10);
+        const maximum = Number.isFinite(parsedMaximum)
+            ? Math.max(minimum, parsedMaximum)
+            : minimum;
+
+        const updateQuantity = (nextValue) => {
+            const parsedValue = Number.parseInt(String(nextValue), 10);
+            const quantity = Number.isFinite(parsedValue)
+                ? Math.min(maximum, Math.max(minimum, parsedValue))
+                : minimum;
+
+            input.value = String(quantity);
+            decreaseButton.disabled = quantity <= minimum;
+            increaseButton.disabled = quantity >= maximum;
+        };
+
+        decreaseButton.addEventListener("click", () => {
+            updateQuantity(Number.parseInt(input.value, 10) - 1);
+        });
+
+        increaseButton.addEventListener("click", () => {
+            updateQuantity(Number.parseInt(input.value, 10) + 1);
+        });
+
+        input.addEventListener("change", () => updateQuantity(input.value));
+        input.addEventListener("blur", () => updateQuantity(input.value));
+        updateQuantity(input.value);
+    });
 })();

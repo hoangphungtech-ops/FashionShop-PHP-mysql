@@ -1,6 +1,10 @@
 <?php
 
 require_once __DIR__ . "/../../includes/db.php";
+require_once __DIR__ . "/../../includes/auth.php";
+require_once __DIR__ . "/../../includes/admin_helpers.php";
+
+require_admin(app_url('auth/login.php'));
 
 $stmt = $pdo->query("
     SELECT *
@@ -9,6 +13,7 @@ $stmt = $pdo->query("
 ");
 
 $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$flash = pull_admin_flash();
 
 ?>
 
@@ -98,8 +103,14 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         .delete {
             color: #a33d3d;
-            text-decoration: none;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+            text-decoration: underline;
         }
+
+        .delete-form { display: inline; }
+        .notice { padding: 12px 15px; margin-bottom: 18px; background: #edf6f0; color: #28553f; }
 
     </style>
 
@@ -140,6 +151,10 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         <div class="box">
 
+            <?php if ($flash !== null): ?>
+                <div class="notice" role="status"><?= e($flash['message'] ?? '') ?></div>
+            <?php endif; ?>
+
             <table>
 
                 <thead>
@@ -179,13 +194,11 @@ $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 Sửa
                             </a>
 
-                            <a
-                                href="delete.php?id=<?= (int)$category['id'] ?>"
-                                class="delete"
-                                onclick="return confirm('Bạn có chắc muốn xóa danh mục này?')"
-                            >
-                                Xóa
-                            </a>
+                            <form class="delete-form" method="post" action="delete.php" onsubmit="return confirm('Bạn có chắc muốn xóa danh mục này?')">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="id" value="<?= (int) $category['id'] ?>">
+                                <button type="submit" class="delete">Xóa</button>
+                            </form>
 
                         </td>
 
