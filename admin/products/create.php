@@ -12,10 +12,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $slug = trim($_POST['slug'] ?? '');
     $price = (float)($_POST['price'] ?? 0);
+    // Bổ sung: Giá gốc
+    $originalPrice = !empty($_POST['original_price']) ? (float)$_POST['original_price'] : null;
     $categoryId = (int)($_POST['category_id'] ?? 0);
     $description = trim($_POST['description'] ?? '');
     $stock = (int)($_POST['stock'] ?? 0);
     $status = isset($_POST['status']) ? 1 : 0;
+
+    // Bổ sung: Size (Ghép mảng checkbox thành chuỗi "S,M,L"), Màu sắc, Chất liệu
+    $sizes = isset($_POST['sizes']) ? implode(',', $_POST['sizes']) : '';
+    $color = trim($_POST['color'] ?? '');
+    $material = trim($_POST['material'] ?? '');
 
     if ($name === '') {
 
@@ -39,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             /*
              * ==========================
-             * 1. THÊM SẢN PHẨM
+             * 1. THÊM SẢN PHẨM (Đã thêm các trường mới vào INSERT)
              * ==========================
              */
 
@@ -49,9 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     name,
                     slug,
                     price,
+                    original_price,
                     category_id,
                     description,
                     stock,
+                    size,
+                    color,
+                    material,
                     status
                 )
                 VALUES
@@ -59,9 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     :name,
                     :slug,
                     :price,
+                    :original_price,
                     :category_id,
                     :description,
                     :stock,
+                    :size,
+                    :color,
+                    :material,
                     :status
                 )
             ");
@@ -70,125 +85,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':name' => $name,
                 ':slug' => $slug,
                 ':price' => $price,
+                ':original_price' => $originalPrice,
                 ':category_id' => $categoryId > 0 ? $categoryId : null,
                 ':description' => $description,
                 ':stock' => $stock,
+                ':size' => $sizes,
+                ':color' => $color,
+                ':material' => $material,
                 ':status' => $status
             ]);
 
             // Lấy ID sản phẩm vừa tạo
             $productId = $pdo->lastInsertId();
 
+/*
+ * ==========================
+ * 2. UPLOAD NHIỀU ẢNH VÀO product_images
+ * ==========================
+ */
+if (isset($_FILES['images']) && !empty($_FILES['images']['name'][0])) {
 
-            /*
-             * ==========================
-             * 2. UPLOAD NHIỀU ẢNH
-             * ==========================
-             */
+    $uploadDir = __DIR__ . "/../../uploads/";
 
-            if (
-                isset($_FILES['images']) &&
-                !empty($_FILES['images']['name'][0])
-            ) {
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0777, true);
+    }
 
-                $uploadDir = __DIR__ . "/../../uploads/";
+    $allowedTypes = ['jpg', 'jpeg', 'png', 'webp'];
+    $isFirst = true; // Dùng để đánh dấu ảnh đầu tiên là ảnh chính (is_primary = 1)
 
-                // Nếu chưa có thư mục uploads thì tạo
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0777, true);
-                }
+    foreach ($_FILES['images']['name'] as $key => $originalName) {
 
-                $allowedTypes = [
-                    'jpg',
-                    'jpeg',
-                    'png',
-                    'webp'
-                ];
+        if ($_FILES['images']['error'][$key] !== UPLOAD_ERR_OK) {
+            continue;
+        }
 
-                $firstImage = null;
+        $tmpName = $_FILES['images']['tmp_name'][$key];
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
-                foreach ($_FILES['images']['name'] as $key => $originalName) {
+        if (!in_array($extension, $allowedTypes)) {
+            continue;
+        }
 
-                    // Bỏ qua file lỗi
-                    if ($_FILES['images']['error'][$key] !== UPLOAD_ERR_OK) {
-                        continue;
-                    }
+        $newName = uniqid('product_', true) . '.' . $extension;
+        $destination = $uploadDir . $newName;
 
-                    $tmpName = $_FILES['images']['tmp_name'][$key];
+        if (move_uploaded_file($tmpName, $destination)) {
+            
+            // Nếu là ảnh đầu tiên thì set is_primary = 1, ngược lại là 0
+            $isPrimary = $isFirst ? 1 : 0;
 
-                    $extension = strtolower(
-                        pathinfo(
-                            $originalName,
-                            PATHINFO_EXTENSION
-                        )
-                    );
+            $imageStmt = $pdo->prepare("
+                INSERT INTO product_images (product_id, image_path, is_primary)
+                VALUES (:product_id, :image_path, :is_primary)
+            ");
 
-                    // Chỉ cho phép ảnh
-                    if (!in_array($extension, $allowedTypes)) {
-                        continue;
-                    }
+            $imageStmt->execute([
+                ':product_id' => $productId,
+                ':image_path' => $newName,
+                ':is_primary' => $isPrimary
+            ]);
 
-                    // Tạo tên file mới
-                    $newName =
-                        uniqid('product_', true)
-                        . '.'
-                        . $extension;
-
-                    $destination = $uploadDir . $newName;
-
-                    if (move_uploaded_file($tmpName, $destination)) {
-
-                        /*
-                         * Lưu ảnh đầu tiên làm ảnh đại diện
-                         */
-                        if ($firstImage === null) {
-                            $firstImage = $newName;
-                        }
-
-                        /*
-                         * Lưu tất cả ảnh vào product_images
-                         */
-                        $imageStmt = $pdo->prepare("
-                            INSERT INTO product_images
-                            (
-                                product_id,
-                                image
-                            )
-                            VALUES
-                            (
-                                :product_id,
-                                :image
-                            )
-                        ");
-
-                        $imageStmt->execute([
-                            ':product_id' => $productId,
-                            ':image' => $newName
-                        ]);
-                    }
-                }
-
-
-                /*
-                 * ==========================
-                 * 3. LƯU ẢNH ĐẠI DIỆN
-                 * ==========================
-                 */
-
-                if ($firstImage !== null) {
-
-                    $updateImage = $pdo->prepare("
-                        UPDATE products
-                        SET image = :image
-                        WHERE id = :id
-                    ");
-
-                    $updateImage->execute([
-                        ':image' => $firstImage,
-                        ':id' => $productId
-                    ]);
-                }
-            }
+            $isFirst = false; // Sau ảnh đầu tiên sẽ chuyển thành false
+        }
+    }
+}
+            
 
 
             /*
@@ -302,6 +264,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 13px;
         }
 
+        .checkbox-group label {
+            display: inline-block;
+            margin-right: 15px;
+            font-weight: normal;
+        }
+
     </style>
 
 </head>
@@ -388,12 +356,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
 
-                <!-- GIÁ -->
+                <!-- GIÁ BÁN & GIÁ GỐC -->
 
                 <div class="form-group">
 
                     <label>
-                        Giá
+                        Giá bán (VNĐ)
                     </label>
 
                     <input
@@ -403,6 +371,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         step="0.01"
                         value="<?= htmlspecialchars($_POST['price'] ?? '') ?>"
                         required
+                    >
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>
+                        Giá gốc / Giá cũ (VNĐ) - <i>Dùng để tính % giảm giá</i>
+                    </label>
+
+                    <input
+                        type="number"
+                        name="original_price"
+                        min="0"
+                        step="0.01"
+                        value="<?= htmlspecialchars($_POST['original_price'] ?? '') ?>"
+                        placeholder="Ví dụ: 2199000"
                     >
 
                 </div>
@@ -439,6 +424,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?php endforeach; ?>
 
                     </select>
+
+                </div>
+
+
+                <!-- KÍCH THƯỚC (SIZE) -->
+
+                <div class="form-group checkbox-group">
+
+                    <label>
+                        Kích thước (Size)
+                    </label>
+
+                    <label><input type="checkbox" name="sizes[]" value="S" style="width:auto"> S</label>
+                    <label><input type="checkbox" name="sizes[]" value="M" style="width:auto"> M</label>
+                    <label><input type="checkbox" name="sizes[]" value="L" style="width:auto"> L</label>
+                    <label><input type="checkbox" name="sizes[]" value="XL" style="width:auto"> XL</label>
+                    <label><input type="checkbox" name="sizes[]" value="XXL" style="width:auto"> XXL</label>
+
+                </div>
+
+
+                <!-- MÀU SẮC & CHẤT LIỆU -->
+
+                <div class="form-group">
+
+                    <label>
+                        Màu sắc
+                    </label>
+
+                    <input
+                        type="text"
+                        name="color"
+                        value="<?= htmlspecialchars($_POST['color'] ?? '') ?>"
+                        placeholder="Ví dụ: Xám than, Trắng, Đen"
+                    >
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>
+                        Chất liệu
+                    </label>
+
+                    <input
+                        type="text"
+                        name="material"
+                        value="<?= htmlspecialchars($_POST['material'] ?? '') ?>"
+                        placeholder="Ví dụ: Cotton dệt kim"
+                    >
 
                 </div>
 
@@ -541,10 +576,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
 
 <script>
+    // Tắt thông báo đỏ của CKEditor
+    CKEDITOR.config.versionCheck = false;
     CKEDITOR.replace('description');
 </script>
 
 </body>
 
 </html>
-

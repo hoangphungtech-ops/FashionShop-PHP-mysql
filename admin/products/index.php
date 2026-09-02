@@ -62,7 +62,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th style="width: 50px;">STT</th>
                     <th>Hình ảnh</th>
                     <th>Tên sản phẩm</th>
                     <th>Danh mục</th>
@@ -72,9 +72,13 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($products as $product): ?>
+            <?php 
+            $stt = 1; // Tạo biến đếm STT liên tục
+            foreach ($products as $product): 
+            ?>
                 <tr>
-                    <td><?= (int)$product['id'] ?></td>
+                    <!-- Đổi id thành stt tự tăng -->
+                    <td><?= $stt++ ?></td>
                     <td>
                         <?php
                         $imgName = trim($product['final_image'] ?? '');
@@ -104,17 +108,17 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <td><?= htmlspecialchars($product['category_name'] ?? 'Chưa có') ?></td>
                     <td><?= number_format((float)$product['price'] * 1000, 0, ',', '.') ?> VNĐ</td>
                     <td>
-                       <?php 
-$stock = (int)($product['stock'] ?? 0);
-$status = (int)($product['status'] ?? 0);
+                        <?php 
+                        $stock = (int)($product['stock'] ?? 0);
+                        $status = (int)($product['status'] ?? 0);
 
-if ($status === 1 && $stock > 0): ?>
-    <span class="status">Đang bán</span>
-<?php elseif ($status === 1 && $stock <= 0): ?>
-    <span class="status" style="background: #fff3cd; color: #856404;">Hết hàng</span>
-<?php else: ?>
-    <span class="status" style="background: #f8d7da; color: #721c24;">Ngừng bán</span>
-<?php endif; ?>
+                        if ($status === 1 && $stock > 0): ?>
+                            <span class="status">Đang bán</span>
+                        <?php elseif ($status === 1 && $stock <= 0): ?>
+                            <span class="status" style="background: #fff3cd; color: #856404;">Hết hàng</span>
+                        <?php else: ?>
+                            <span class="status" style="background: #f8d7da; color: #721c24;">Ngừng bán</span>
+                        <?php endif; ?>
                     </td>
                     <td>
                         <a href="edit.php?id=<?= (int)$product['id'] ?>" class="edit">Sửa</a>
