@@ -5,7 +5,7 @@ require_once __DIR__ . "/../../includes/db.php";
 $stmt = $pdo->query("
     SELECT *
     FROM categories
-    ORDER BY id DESC
+    ORDER BY id ASC
 ");
 
 $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
