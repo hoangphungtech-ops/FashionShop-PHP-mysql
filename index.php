@@ -149,17 +149,26 @@ function getProductImage($image)
             </a>
 
         </nav>
-
-
-        <a href="cart/index.php"
-           class="cart">
-
-            Giỏ hàng
-
-            <span>0</span>
-
-        </a>
-
+        <div style="display: flex; gap: 10px;">
+            <a href="auth/index.php">
+                <?php 
+                    if (isset($_SESSION['user_id'])) {
+                        echo "Tài khoản";
+                    }else {
+                        echo "Đăng nhập/Đăng ký";
+                    }
+                ?>
+            </a>
+    
+            <a href="cart/index.php"
+               class="cart">
+    
+                Giỏ hàng
+    
+                <span>0</span>
+    
+            </a>
+        </div>
     </div>
 
 </header>
