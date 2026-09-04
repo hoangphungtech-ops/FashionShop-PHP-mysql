@@ -1,0 +1,209 @@
+<?php
+
+require_once __DIR__ . "/includes/db.php";
+
+/* =========================
+   GET PRODUCTS
+========================= */
+
+$products = [];
+
+try {
+    $sql = "SELECT p.*, 
+                   COALESCE(NULLIF(p.image, ''), pi.image_path) AS final_image
+            FROM products p
+            LEFT JOIN product_images pi ON p.id = pi.product_id AND (pi.is_primary = 1 OR pi.is_primary IS NULL)
+            WHERE p.status = 1
+            GROUP BY p.id
+            ORDER BY p.id DESC
+            LIMIT 6";
+
+    $stmt = $pdo->query($sql);
+    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    $products = [];
+}
+
+
+/* =========================
+   PRODUCT IMAGE
+========================= */
+
+if (!function_exists('getProductImage')) {
+    function getProductImage($image)
+    {
+        $image = trim($image ?? '');
+
+        if ($image === '') {
+            return 'assets/images/ao-thun.jpg';
+        }
+
+        if (filter_var($image, FILTER_VALIDATE_URL)) {
+            return $image;
+        }
+
+        $filename = basename($image);
+
+        // Kiểm tra đúng các vị trí thư mục uploads có thể chứa file
+        if (file_exists(__DIR__ . "/uploads/" . $filename)) {
+            return "uploads/" . $filename;
+        }
+        if (file_exists(__DIR__ . "/uploads/products/" . $filename)) {
+            return "uploads/products/" . $filename;
+        }
+        if (file_exists(__DIR__ . "/assets/images/" . $filename)) {
+            return "assets/images/" . $filename;
+        }
+
+        // Mặc định trả về đường dẫn uploads nếu có tên file
+        return !empty($filename) ? "uploads/" . $filename : "assets/images/ao-thun.jpg";
+    }
+}
+
+?>
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fashion Shop</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+
+<body>
+
+<!-- HEADER -->
+<header class="header">
+    <div class="container header-content">
+        <a href="index.php" class="logo">Fashion<span>Shop</span></a>
+        <nav class="nav">
+            <a href="index.php">Trang chủ</a>
+            <a href="products/index.php">Sản phẩm</a>
+            <a href="products/index.php?category=1">Áo</a>
+            <a href="products/index.php?category=2">Quần</a>
+            <a href="products/index.php?category=3">Váy</a>
+        </nav>
+        <a href="cart/index.php" class="cart">Giỏ hàng <span>0</span></a>
+    </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="container hero-content">
+        <div class="hero-text">
+            <div class="small-title">FASHION SHOP</div>
+            <h1>Thời trang <span>dành cho bạn</span></h1>
+            <p>Khám phá những thiết kế thời trang trẻ trung, hiện đại và thanh lịch. Tìm cho mình phong cách phù hợp với cá tính riêng của bạn.</p>
+            <a href="products/index.php" class="btn">Khám phá sản phẩm <span>→</span></a>
+        </div>
+        <div class="hero-image">
+            <img src="assets/images/ao-so-mi-nu - Copy.jpg" alt="Fashion Shop">
+        </div>
+    </div>
+</section>
+
+<!-- PRODUCTS -->
+<section class="products">
+    <div class="container">
+        <div class="section-header">
+            <div>
+                <div class="small-title">OUR COLLECTION</div>
+                <h2>Sản phẩm nổi bật</h2>
+            </div>
+            <a href="products/index.php" class="view-all">Xem tất cả →</a>
+        </div>
+
+        <div class="product-grid">
+            <?php if (!empty($products)): ?>
+                <?php foreach ($products as $product): ?>
+                    <?php 
+                    $rawImage = !empty($product['final_image']) ? $product['final_image'] : ($product['image'] ?? '');
+                    $image = getProductImage($rawImage);
+                    ?>
+                    <div class="product-card">
+                        <a href="products/detail.php?id=<?= (int)$product['id'] ?>" class="product-image">
+                            <span class="new">NEW</span>
+                            <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>">
+                        </a>
+                        <div class="product-info">
+                            <small>FASHION</small>
+                            <h3>
+                                <a href="products/detail.php?id=<?= (int)$product['id'] ?>">
+                                    <?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>
+                                </a>
+                            </h3>
+                            <div class="price">
+                                <?= number_format((float)($product['price'] ?? 0) * 1000, 0, ',', '.') ?>đ
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="empty-products">
+                    <h3>Chưa có sản phẩm</h3>
+                    <p>Hiện tại chưa có sản phẩm để hiển thị.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</section>
+
+<!-- WHY -->
+<section class="why">
+    <div class="container why-content">
+        <div>
+            <div class="small-title">WHY CHOOSE US?</div>
+            <h2>Đẹp theo cách<br>của bạn.</h2>
+        </div>
+        <div class="features">
+            <div class="feature">
+                <div class="number">01</div>
+                <h3>Chất lượng tốt</h3>
+                <p>Sản phẩm được lựa chọn kỹ càng và phù hợp để sử dụng hằng ngày.</p>
+            </div>
+            <div class="feature">
+                <div class="number">02</div>
+                <h3>Thiết kế hiện đại</h3>
+                <p>Kiểu dáng trẻ trung, dễ phối đồ và phù hợp với nhiều phong cách.</p>
+            </div>
+            <div class="feature">
+                <div class="number">03</div>
+                <h3>Giao hàng nhanh</h3>
+                <p>Đóng gói cẩn thận và giao hàng đến tận nơi.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="container">
+        <div class="footer-content">
+            <div>
+                <h3>Fashion<span>Shop</span></h3>
+                <p>Thời trang trẻ trung, hiện đại và phù hợp với phong cách riêng của bạn.</p>
+            </div>
+            <div>
+                <h4>Danh mục</h4>
+                <a href="products/index.php">Tất cả sản phẩm</a>
+                <a href="products/index.php?category=1">Áo</a>
+                <a href="products/index.php?category=2">Quần</a>
+                <a href="products/index.php?category=3">Váy</a>
+            </div>
+            <div>
+                <h4>Hỗ trợ</h4>
+                <a href="#">Chính sách đổi trả</a>
+                <a href="#">Vận chuyển</a>
+                <a href="#">Liên hệ</a>
+            </div>
+        </div>
+        <div class="copyright">
+            © 2026 Fashion Shop
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
