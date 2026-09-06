@@ -1,5 +1,7 @@
 <?php
+require_once __DIR__ . '/../includes/db.php';
 
+<<<<<<< HEAD
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/db.php';
@@ -13,6 +15,62 @@ function catalogStringInput(string $key, int $maxLength = 100): string
     }
 
     $value = trim(str_replace("\0", '', $value));
+=======
+
+/* =========================
+   LỌC SẢN PHẨM THEO DANH MỤC
+========================= */
+
+$category = isset($_GET['category'])
+    ? (int)$_GET['category']
+    : 0;
+
+
+/* =========================
+   LẤY SẢN PHẨM
+========================= */
+
+try {
+
+    if ($category > 0) {
+
+        // Có chọn danh mục
+        $stmt = $pdo->prepare("
+            SELECT 
+                p.*,
+                c.name AS category_name
+            FROM products p
+            LEFT JOIN categories c 
+                ON p.category_id = c.id
+            WHERE p.status = 1
+              AND p.category_id = ?
+            ORDER BY p.id DESC
+        ");
+
+        $stmt->execute([$category]);
+
+    } else {
+
+        // Không chọn danh mục -> hiện tất cả
+        $stmt = $pdo->query("
+            SELECT 
+                p.*,
+                c.name AS category_name
+            FROM products p
+            LEFT JOIN categories c 
+                ON p.category_id = c.id
+            WHERE p.status = 1
+            ORDER BY p.id DESC
+        ");
+
+    }
+
+    $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+
+    $products = [];
+>>>>>>> origin/GiaoDien-Nghi
 
     return function_exists('mb_substr')
         ? mb_substr($value, 0, $maxLength, 'UTF-8')
@@ -23,6 +81,7 @@ function catalogPriceInput(string $key): ?float
 {
     $value = $_GET[$key] ?? null;
 
+<<<<<<< HEAD
     if (!is_string($value) || trim($value) === '') {
         return null;
     }
@@ -35,44 +94,35 @@ function catalogPriceInput(string $key): ?float
 }
 
 function getProductImage(mixed $image): string
+=======
+/* =========================
+   HÀM XỬ LÝ ẢNH
+========================= */
+
+function productImage($image)
+>>>>>>> origin/GiaoDien-Nghi
 {
-    $image = trim((string)($image ?? ''));
-
-    // Không có ảnh
-    if ($image === '') {
-        return '../assets/images/ao-thun.jpg';
+    if (empty($image)) {
+        return '../assets/images/no-image.jpg';
     }
 
-    // Chuẩn hóa đường dẫn
-    $image = str_replace('\\', '/', $image);
-    $image = ltrim($image, '/');
+    $image = trim($image);
 
-    // DB lưu nguyên đường dẫn:
-    // assets/images/abc.jpg
-    // uploads/products/abc.jpg
-    $fullPath = __DIR__ . '/../' . $image;
-
-    if (file_exists($fullPath)) {
-        return '../' . $image;
+    // Nếu database đã lưu đường dẫn đầy đủ
+    if (
+        str_starts_with($image, 'http://') ||
+        str_starts_with($image, 'https://') ||
+        str_starts_with($image, '../') ||
+        str_starts_with($image, '/')
+    ) {
+        return $image;
     }
 
-    // Trường hợp DB chỉ lưu tên file
-    $filename = basename($image);
-
-    // Tìm trong uploads/products
-    if (file_exists(__DIR__ . '/../uploads/products/' . $filename)) {
-        return '../uploads/products/' . $filename;
-    }
-
-    // Tìm trong assets/images
-    if (file_exists(__DIR__ . '/../assets/images/' . $filename)) {
-        return '../assets/images/' . $filename;
-    }
-
-    // Ảnh mặc định
-    return '../assets/images/ao-thun.jpg';
+    // Ảnh nằm trong uploads/products
+    return '../uploads/products/' . $image;
 }
 
+<<<<<<< HEAD
 $search = catalogStringInput('q');
 $gender = strtolower(catalogStringInput('gender', 10));
 $gender = in_array($gender, ['nam', 'nu'], true) ? $gender : '';
@@ -244,10 +294,38 @@ $buildCatalogUrl = static function (array $overrides = []) use ($queryState): st
 
 $firstVisibleProduct = $totalProducts > 0 ? (($page - 1) * $perPage) + 1 : 0;
 $lastVisibleProduct = min($page * $perPage, $totalProducts);
+=======
+
+/* =========================
+   TIÊU ĐỀ THEO DANH MỤC
+========================= */
+
+if ($category == 1) {
+
+    $pageTitle = 'Áo';
+    $pageDescription = 'Khám phá những mẫu áo trẻ trung, hiện đại và dễ phối đồ.';
+
+} elseif ($category == 2) {
+
+    $pageTitle = 'Quần';
+    $pageDescription = 'Khám phá những mẫu quần thời trang, thoải mái và phong cách.';
+
+} elseif ($category == 3) {
+
+    $pageTitle = 'Váy';
+    $pageDescription = 'Khám phá những mẫu váy thanh lịch, nữ tính và hiện đại.';
+
+} else {
+
+    $pageTitle = 'Tất cả sản phẩm';
+    $pageDescription = 'Khám phá những thiết kế thời trang hiện đại và thanh lịch.';
+
+}
+
+>>>>>>> origin/GiaoDien-Nghi
 ?>
 
 <!DOCTYPE html>
-
 <html lang="vi">
 
 <head>
@@ -259,45 +337,143 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
         content="width=device-width, initial-scale=1.0"
     >
 
+<<<<<<< HEAD
     <title><?= htmlspecialchars($pageHeading) ?> - Fashion Shop</title>
+=======
+    <title>
+        <?= htmlspecialchars($pageTitle) ?> | Fashion Shop
+    </title>
+>>>>>>> origin/GiaoDien-Nghi
 
     <link
         rel="stylesheet"
         href="../assets/css/style.css"
     >
 
+
     <style>
 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f7f8f5;
+            color: #123c32;
+        }
+
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+
         /* =========================
-           PRODUCTS PAGE
+           HEADER
         ========================= */
 
-        .products-page {
-            padding: 70px 0 90px;
-            background: #ffffff;
+        .shop-header {
+            height: 84px;
+
+            background: #fff;
+
+            border-bottom: 1px solid #e5e9e4;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            padding: 0 5%;
         }
 
-        .products-page-header {
+
+        .logo {
+            font-size: 27px;
+
+            font-weight: 800;
+
+            letter-spacing: 1px;
+        }
+
+
+        .logo span {
+            color: #7b9c8c;
+        }
+
+
+        .nav {
+            display: flex;
+
+            align-items: center;
+
+            gap: 30px;
+        }
+
+
+        .nav a {
+            font-size: 16px;
+
+            font-weight: 600;
+
+            transition: .2s;
+        }
+
+
+        .nav a:hover {
+            color: #789786;
+        }
+
+
+        /* =========================
+           PAGE TITLE
+        ========================= */
+
+        .page {
+            max-width: 1280px;
+
+            margin: auto;
+
+            padding: 70px 30px 90px;
+        }
+
+
+        .page-heading {
             text-align: center;
+<<<<<<< HEAD
             margin-bottom: 30px;
+=======
+
+            margin-bottom: 55px;
+>>>>>>> origin/GiaoDien-Nghi
         }
 
-        .products-page-header .small-title {
-            margin-bottom: 12px;
-        }
 
-        .products-page-header h1 {
-            font-size: 45px;
-            line-height: 1.1;
-            color: #263126;
+        .small-title {
+            color: #789786;
+
+            font-size: 13px;
+
+            font-weight: 700;
+
+            letter-spacing: 4px;
+
             margin-bottom: 15px;
         }
 
-        .products-page-header p {
-            max-width: 600px;
-            margin: 0 auto;
-            color: #667066;
-            font-size: 15px;
+
+        .page-heading h1 {
+            font-size: 46px;
+
+            line-height: 1.1;
+
+            margin-bottom: 15px;
         }
 
         .products-page-header .products-page-count {
@@ -313,6 +489,7 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
         }
 
 
+<<<<<<< HEAD
         /* =========================
            SEARCH / FILTER / SORT
         ========================= */
@@ -463,6 +640,12 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
             background: #263126;
             color: #ffffff;
             border-color: #263126;
+=======
+        .page-heading p {
+            color: #718078;
+
+            font-size: 17px;
+>>>>>>> origin/GiaoDien-Nghi
         }
 
         .category-filter a:focus-visible {
@@ -475,10 +658,13 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
            PRODUCT GRID
         ========================= */
 
-        .products-page .product-grid {
+        .product-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 28px;
+
+            grid-template-columns:
+                repeat(3, 1fr);
+
+            gap: 32px;
         }
 
 
@@ -486,6 +672,7 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
            PRODUCT CARD
         ========================= */
 
+<<<<<<< HEAD
         .products-page .product-card {
             display: flex;
             min-width: 0;
@@ -493,82 +680,108 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
             flex-direction: column;
             background: #ffffff;
             border: 1px solid #e7ece7;
+=======
+        .product-card {
+            background: #fff;
+
+            border: 1px solid #e1e7e2;
+
+>>>>>>> origin/GiaoDien-Nghi
             overflow: hidden;
-            transition: 0.3s ease;
+
+            transition:
+                transform .25s ease,
+                box-shadow .25s ease;
         }
 
-        .products-page .product-card:hover {
-            transform: translateY(-5px);
+
+        .product-card:hover {
+            transform: translateY(-7px);
 
             box-shadow:
-                0 12px 30px
-                rgba(38, 49, 38, 0.09);
+                0 18px 40px rgba(18, 60, 50, .12);
+        }
+
+
+        .product-link {
+            display: block;
         }
 
 
         /* =========================
-           PRODUCT IMAGE
+           IMAGE
         ========================= */
 
-        .products-page .product-image {
-            position: relative;
-
+        .product-image {
             width: 100%;
+<<<<<<< HEAD
             height: auto;
             aspect-ratio: 4 / 5;
+=======
+>>>>>>> origin/GiaoDien-Nghi
 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            height: 420px;
+
+            background: #f1f3ef;
 
             overflow: hidden;
 
-            background: #f3f5f3;
+            position: relative;
         }
 
-        .products-page .product-image img {
+
+        .product-image img {
             width: 100%;
+
             height: 100%;
 
             object-fit: cover;
 
-            transition: 0.5s ease;
+            display: block;
+
+            transition:
+                transform .4s ease;
         }
 
-        .products-page .product-card:hover
+
+        .product-card:hover
         .product-image img {
             transform: scale(1.04);
         }
 
 
         /* =========================
-           NEW
+           NEW LABEL
         ========================= */
 
-        .products-page .new {
+        .new-label {
             position: absolute;
 
-            top: 15px;
-            left: 15px;
+            top: 18px;
 
-            z-index: 2;
+            left: 18px;
 
-            padding: 6px 11px;
+            background: #123c32;
 
-            background: #263126;
-            color: #ffffff;
+            color: #fff;
 
-            font-size: 10px;
+            padding: 9px 14px;
+
+            font-size: 12px;
+
             font-weight: 700;
 
             letter-spacing: 1px;
+
+            z-index: 2;
         }
 
 
         /* =========================
-           INFO
+           PRODUCT INFO
         ========================= */
 
+<<<<<<< HEAD
         .products-page .product-info {
             display: flex;
             min-height: 132px;
@@ -583,35 +796,45 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
 
         .products-page .product-info small {
             font-size: 10px;
+=======
+        .product-info {
+            padding: 25px 27px 28px;
+        }
+
+
+        .category {
+            color: #789786;
+
+            font-size: 12px;
+
+>>>>>>> origin/GiaoDien-Nghi
             font-weight: 700;
 
-            letter-spacing: 2px;
+            letter-spacing: 3px;
 
-            color: #8a958b;
+            text-transform: uppercase;
+
+            margin-bottom: 12px;
         }
 
-        .products-page .product-info h3 {
-            margin-top: 7px;
-            margin-bottom: 10px;
 
-            font-size: 18px;
+        .product-name {
+            font-size: 22px;
 
-            color: #263126;
-        }
-
-        .products-page .product-info h3 a {
-            transition: 0.3s ease;
-        }
-
-        .products-page .product-info h3 a:hover {
-            color: #78917d;
-        }
-
-        .products-page .price {
-            font-size: 18px;
             font-weight: 700;
 
-            color: #263126;
+            color: #123c32;
+
+            margin-bottom: 16px;
+        }
+
+
+        .product-price {
+            color: #6d917e;
+
+            font-size: 21px;
+
+            font-weight: 800;
         }
 
 
@@ -619,28 +842,19 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
            EMPTY
         ========================= */
 
-        .products-empty {
-            grid-column: 1 / -1;
-
+        .empty {
             text-align: center;
 
             padding: 80px 20px;
 
-            background: #f8faf8;
+            background: #fff;
 
-            border: 1px dashed #d6ddd7;
+            border: 1px solid #e1e7e2;
         }
 
-        .products-empty h3 {
+
+        .empty h2 {
             margin-bottom: 10px;
-
-            font-size: 23px;
-
-            color: #263126;
-        }
-
-        .products-empty p {
-            color: #788078;
         }
 
         .products-empty a {
@@ -699,73 +913,8 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
         }
 
 
-        /* =========================
-           FOOTER
-        ========================= */
-
-        .products-footer {
-            background: #263126;
-            color: #ffffff;
-
-            padding: 50px 0 25px;
-        }
-
-        .products-footer-content {
-            display: grid;
-
-            grid-template-columns:
-                2fr 1fr 1fr;
-
-            gap: 50px;
-
-            padding-bottom: 35px;
-        }
-
-        .products-footer h3 {
-            font-size: 25px;
-            margin-bottom: 12px;
-        }
-
-        .products-footer h3 span {
-            color: #9ab19f;
-        }
-
-        .products-footer p {
-            max-width: 350px;
-
-            color: #bdc6bd;
-
-            font-size: 14px;
-        }
-
-        .products-footer h4 {
-            margin-bottom: 15px;
-        }
-
-        .products-footer a {
-            display: block;
-
-            margin-bottom: 9px;
-
-            color: #bdc6bd;
-
-            font-size: 14px;
-        }
-
-        .products-footer a:hover {
-            color: #ffffff;
-        }
-
-        .products-copyright {
-            border-top: 1px solid #465046;
-
-            padding-top: 20px;
-
-            text-align: center;
-
-            color: #9fa99f;
-
-            font-size: 12px;
+        .empty p {
+            color: #777;
         }
 
 
@@ -775,6 +924,7 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
 
         @media (max-width: 900px) {
 
+<<<<<<< HEAD
             .catalog-filter {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -786,25 +936,33 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
 
             .products-page .product-grid {
                 grid-template-columns: repeat(2, 1fr);
+=======
+            .product-grid {
+                grid-template-columns:
+                    repeat(2, 1fr);
+>>>>>>> origin/GiaoDien-Nghi
             }
 
-            .products-footer-content {
-                grid-template-columns: 1fr 1fr;
+
+            .product-image {
+                height: 350px;
             }
 
         }
 
 
-        @media (max-width: 700px) {
+        @media (max-width: 600px) {
 
-            .products-page {
-                padding: 50px 0 60px;
+            .shop-header {
+                padding: 0 20px;
             }
 
-            .products-page-header h1 {
-                font-size: 36px;
+
+            .logo {
+                font-size: 21px;
             }
 
+<<<<<<< HEAD
             .catalog-toolbar {
                 padding: 16px;
             }
@@ -847,9 +1005,36 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
                 height: auto;
                 aspect-ratio: 4 / 5;
             }
+=======
 
-            .products-footer-content {
+            .nav {
+                gap: 12px;
+            }
+
+
+            .nav a {
+                font-size: 14px;
+            }
+
+
+            .page {
+                padding: 45px 15px 60px;
+            }
+
+
+            .page-heading h1 {
+                font-size: 34px;
+            }
+
+
+            .product-grid {
                 grid-template-columns: 1fr;
+            }
+
+>>>>>>> origin/GiaoDien-Nghi
+
+            .product-image {
+                height: 430px;
             }
 
         }
@@ -862,19 +1047,17 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
 <body class="catalog-page">
 
 
-<!-- =========================
-     HEADER
-========================= -->
+    <!-- =========================
+         HEADER
+    ========================= -->
 
-<header class="header">
-
-    <div class="container header-content">
+    <header class="shop-header">
 
         <a
             href="../index.php"
             class="logo"
         >
-            Fashion<span>Shop</span>
+            FASHION <span>SHOP</span>
         </a>
 
 
@@ -884,10 +1067,12 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
                 Trang chủ
             </a>
 
+
             <a href="index.php">
                 Sản phẩm
             </a>
 
+<<<<<<< HEAD
             <a href="index.php?gender=nam">
                 Nam
             </a>
@@ -895,64 +1080,70 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
             <a href="index.php?gender=nu">
                 Nữ
             </a>
+=======
+
+            <!-- ÁO -->
+>>>>>>> origin/GiaoDien-Nghi
 
             <a href="index.php?category=1">
                 Áo
             </a>
 
+
+            <!-- QUẦN -->
+
             <a href="index.php?category=2">
                 Quần
             </a>
+
+
+            <!-- VÁY -->
 
             <a href="index.php?category=3">
                 Váy
             </a>
 
+
+            <a href="../cart/index.php">
+                Giỏ hàng
+            </a>
+
+
+            <a href="../auth/login.php">
+                Tài khoản
+            </a>
+
         </nav>
 
-
-        <a
-            href="../cart/index.php"
-            class="cart"
-        >
-
-            Giỏ hàng
-
-            <span>0</span>
-
-        </a>
-
-    </div>
-
-</header>
+    </header>
 
 
 
-<!-- =========================
-     PRODUCTS PAGE
-========================= -->
+    <!-- =========================
+         CONTENT
+    ========================= -->
 
-<section class="products-page">
-
-    <div class="container">
+    <main class="page">
 
 
-        <!-- TITLE -->
-
-        <div class="products-page-header">
+        <div class="page-heading">
 
             <div class="small-title">
                 OUR COLLECTION
             </div>
 
+
             <h1>
+<<<<<<< HEAD
                 <?= htmlspecialchars($pageHeading) ?>
+=======
+                <?= htmlspecialchars($pageTitle) ?>
+>>>>>>> origin/GiaoDien-Nghi
             </h1>
 
+
             <p>
-                Khám phá những sản phẩm thời trang
-                trẻ trung, hiện đại và phù hợp
-                với phong cách của bạn.
+                <?= htmlspecialchars($pageDescription) ?>
             </p>
 
             <p class="products-page-count">
@@ -964,6 +1155,7 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
 
 
         <!-- =========================
+<<<<<<< HEAD
              SEARCH / FILTER / SORT
         ========================= -->
 
@@ -1293,78 +1485,132 @@ $lastVisibleProduct = min($page * $perPage, $totalProducts);
                 <h3>
                     Fashion<span>Shop</span>
                 </h3>
+=======
+             PRODUCTS
+        ========================= -->
+
+        <?php if (empty($products)): ?>
+
+
+            <div class="empty">
+
+                <h2>
+                    Chưa có sản phẩm
+                </h2>
+
+>>>>>>> origin/GiaoDien-Nghi
 
                 <p>
-                    Thời trang trẻ trung,
-                    hiện đại và phù hợp
-                    với phong cách riêng
-                    của bạn.
+                    Hiện tại cửa hàng chưa có sản phẩm nào
+                    trong danh mục này.
                 </p>
 
             </div>
 
 
+        <?php else: ?>
 
-            <div>
 
-                <h4>
-                    Danh mục
-                </h4>
+            <div class="product-grid">
 
-                <a href="index.php">
-                    Tất cả sản phẩm
-                </a>
 
-                <a href="index.php?category=1">
-                    Áo
-                </a>
+                <?php foreach ($products as $product): ?>
 
-                <a href="index.php?category=2">
-                    Quần
-                </a>
 
-                <a href="index.php?category=3">
-                    Váy
-                </a>
+                    <article class="product-card">
+
+
+                        <!--
+                            BẤM VÀO CARD
+                            -> DETAIL SẢN PHẨM
+                        -->
+
+                        <a
+                            href="detail.php?id=<?= (int)$product['id'] ?>"
+                            class="product-link"
+                        >
+
+
+                            <div class="product-image">
+
+
+                                <span class="new-label">
+                                    NEW
+                                </span>
+
+
+                                <img
+                                    src="<?= htmlspecialchars(
+                                        productImage(
+                                            $product['image'] ?? ''
+                                        )
+                                    ) ?>"
+                                    alt="<?= htmlspecialchars(
+                                        $product['name']
+                                    ) ?>"
+                                    loading="lazy"
+                                >
+
+
+                            </div>
+
+
+
+                            <div class="product-info">
+
+
+                                <div class="category">
+
+                                    <?= htmlspecialchars(
+                                        $product['category_name']
+                                        ?? 'FASHION'
+                                    ) ?>
+
+                                </div>
+
+
+
+                                <h2 class="product-name">
+
+                                    <?= htmlspecialchars(
+                                        $product['name']
+                                    ) ?>
+
+                                </h2>
+
+
+
+                                <div class="product-price">
+
+                                    <?= number_format(
+                                        (float)$product['price'],
+                                        0,
+                                        ',',
+                                        '.'
+                                    ) ?>đ
+
+                                </div>
+
+
+                            </div>
+
+
+                        </a>
+
+
+                    </article>
+
+
+                <?php endforeach; ?>
+
 
             </div>
 
 
-
-            <div>
-
-                <h4>
-                    Hỗ trợ
-                </h4>
-
-                <a href="#">
-                    Chính sách đổi trả
-                </a>
-
-                <a href="#">
-                    Vận chuyển
-                </a>
-
-                <a href="#">
-                    Liên hệ
-                </a>
-
-            </div>
+        <?php endif; ?>
 
 
-        </div>
-
-
-        <div class="products-copyright">
-
-            © 2026 Fashion Shop
-
-        </div>
-
-
-    </div>
-
-</footer>
+    </main>
 
 
 </body>
