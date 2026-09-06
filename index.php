@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/includes/db.php";
+require_once __DIR__ . "/includes/auth.php";
 
 /* =========================
    GET PRODUCTS
@@ -150,14 +151,23 @@ function getProductImage($image)
         </nav>
 
 
-        <a href="cart/index.php"
-           class="cart">
+        <div style="display: flex; gap: 10px;">
 
-            Giỏ hàng
+            <a href="<?= is_logged_in() ? 'auth/profile.php' : 'auth/login.php' ?>">
+                <?= is_logged_in() ? 'Tài khoản' : 'Đăng nhập/Đăng ký' ?>
+            </a>
 
-            <span>0</span>
 
-        </a>
+            <a href="cart/index.php"
+               class="cart">
+
+                Giỏ hàng
+
+                <span>0</span>
+
+            </a>
+
+        </div>
 
     </div>
 
@@ -211,46 +221,62 @@ function getProductImage($image)
 
             </a>
 
-            <div class="hero-meta" aria-label="Thông tin bộ sưu tập">
+
+            <div class="hero-meta"
+                 aria-label="Thông tin bộ sưu tập">
+
                 <span>✦ NEW COLLECTION</span>
+
                 <span>MEN &amp; WOMEN</span>
+
                 <span>MODERN / ELEGANT</span>
+
             </div>
 
         </div>
 
 
 
-<div class="hero-duo">
+        <div class="hero-duo">
 
-    <div class="hero-duo-card hero-duo-card--male">
-        <img
-            src="assets/images/namthanhlich.png"
-            alt="Thời trang nam thanh lịch"
-        >
+            <div class="hero-duo-card hero-duo-card--male">
 
-        <span class="hero-duo-label">
-            MEN / TAILORED
-        </span>
-    </div>
+                <img
+                    src="assets/images/namthanhlich.png"
+                    alt="Thời trang nam thanh lịch"
+                >
 
-    <div class="hero-duo-card hero-duo-card--female">
-        <img
-            src="assets/images/hero-fashion-nu-new.png"
-            alt="Thời trang nữ hiện đại"
-        >
+                <span class="hero-duo-label">
+                    MEN / TAILORED
+                </span>
 
-        <span class="hero-duo-label">
-            WOMEN / NEW EDIT
-        </span>
-    </div>
+            </div>
 
-    <div class="hero-duo-badge">
-        <strong>FS</strong>
-        <span>EDIT · 2026</span>
-    </div>
 
-</div>
+            <div class="hero-duo-card hero-duo-card--female">
+
+                <img
+                    src="assets/images/hero-fashion-nu-new.png"
+                    alt="Thời trang nữ hiện đại"
+                >
+
+                <span class="hero-duo-label">
+                    WOMEN / NEW EDIT
+                </span>
+
+            </div>
+
+
+            <div class="hero-duo-badge">
+
+                <strong>FS</strong>
+
+                <span>EDIT · 2026</span>
+
+            </div>
+
+        </div>
+
     </div>
 
 </section>
