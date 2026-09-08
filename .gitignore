@@ -29,3 +29,14 @@ uploads/products/*
 
 # Local dependencies (project currently has no Composer dependency)
 vendor/
+config/mail.local.php
+config/mail.local.php
+vendor/
+database/backup-*/
+database/backup_*/
+database/AUDIT_*/
+database/WEB_HEALTH_*/
+database/FINAL_CART_ORDER_AUDIT_*/
+database/GIT_LOCAL_SAVE_*/
+database/ngan_git_exact_stage/
+database/backup_placeholder_ngan_*/

@@ -1,0 +1,172 @@
+FASHIONSHOP - KHOI PHUC ANH NGAN
+================================
+Tong SQL can: 93
+Anh that khoi phuc: 70
+Con placeholder: 23
+
+===== ANH THAT DA KHOI PHUC =====
+product_6a95043e37d7e7.06710049.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a95043e37d7e7.06710049.jpg | 2a13ac6e4c7d2b3a97a8611973f7c160008e7b66
+product_6a950af3ac77e7.41048516.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a950af3ac77e7.41048516.jpg | 028d08b533b2aa0675d16470b5edc445b4dcca2a
+product_6a950c0b64e256.10175962.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a950c0b64e256.10175962.jpg | 27a0ebcf2113ba825a330d9b09832afc98235f84
+product_6a950d112f7225.49409242.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a950d112f7225.49409242.jpg | 68f9522422411362d340c1dbdb2e5eecdfc33327
+product_6a950f952a7c29.22722959.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a950f952a7c29.22722959.jpg | 7d597158358b3c634f771fce6e9972b5299135ae
+product_6a951036eb2748.25897447.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a951036eb2748.25897447.jpg | 42efb387f0e0e318ebf607232a118a3b52e72c0c
+product_6a95110ff119c6.73415053.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a95110ff119c6.73415053.jpg | fbcda65793213af10e1df4ae8c0740f422a437e1
+product_6a9511c87a7951.68311707.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9511c87a7951.68311707.jpg | fffe0983a71c2a4691de1a896a572bfd2109a8a8
+product_6a95124e898549.89574751.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a95124e898549.89574751.jpg | 8ee760e8820baa0e2aa6287e0dff29be74539e7c
+product_6a95136e5495a3.03982113.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a95136e5495a3.03982113.jpg | a8461b2d81151b78c91bb206278d503eacd42d84
+product_6a9514531e6a86.27578002.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9514531e6a86.27578002.jpg | 486fb13c528198d25f37dc4cbaf061888d4149e9
+product_6a9857ebce9cf7.51754449.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9857ebce9cf7.51754449.png | 9057febe080b50b5a29bb10989cc1e8f472db052
+product_6a9857ebcf1fd2.15114762.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9857ebcf1fd2.15114762.png | bead923616ec271a8fad53e637f57ba3e405608e
+product_6a9857ebcfa450.86176228.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9857ebcfa450.86176228.png | 093aadab6587557a682124a70f4d3fbfd379b139
+product_6a985be68f8028.64447236.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985be68f8028.64447236.png | 9dfbe82fb43157d46c93269364650015ac130cbc
+product_6a985be6901786.00601447.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985be6901786.00601447.png | 93d013e86555610543913f0221d096cc603a3c49
+product_6a985be690a181.80096760.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985be690a181.80096760.png | d155155b0c05782fee12719be24a8d77f37a1df4
+product_6a985d3b1f5b19.10713320.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985d3b1f5b19.10713320.png | 52ab340bdc7aa873b7ea88b4db8f794e444b5e54
+product_6a985d3b1fee24.70511891.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985d3b1fee24.70511891.png | 0499c629dc2932135beba3dc939a840d3e4fa37f
+product_6a985d3b207406.27652489.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985d3b207406.27652489.png | dca1b50dacd764268b6a2f10cd114a665fe6e49f
+product_6a985eb84ce3c1.07886262.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985eb84ce3c1.07886262.png | 07bb6f6d67e412df7ae6b8a5a7332f5b4d2b01d9
+product_6a985eb84d9bb4.29953220.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985eb84d9bb4.29953220.png | d070a9bf820eb97f494a4d5f745ba1cafa74ef2d
+product_6a985eb84e30a3.94036938.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985eb84e30a3.94036938.png | 9b622b4c78608271a6bc485cb8fca1cc8c43ce79
+product_6a985ffd17c339.03767238.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985ffd17c339.03767238.png | 0c845978867cffe64608f6727089d426be964f3f
+product_6a985ffd186e52.61851324.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985ffd186e52.61851324.png | e39670ed58a5c5e8619f42ee2d20d7a6e640777f
+product_6a985ffd192c50.24776283.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a985ffd192c50.24776283.png | 388556e0f2478a240b84f28810630d6aa22b395d
+product_6a98616b9b7706.22678599.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98616b9b7706.22678599.png | 758c9ba5af83268a97a43b58387172d98f702011
+product_6a98616b9c1bb7.54740817.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98616b9c1bb7.54740817.png | e0792eab56bea75d3b8856ddd748f0773b7a54b7
+product_6a98616b9cdae2.59597473.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98616b9cdae2.59597473.png | f56052bf5799e93d9dbe7be76b427d000636ccb5
+product_6a98631f718cd5.43716985.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98631f718cd5.43716985.png | 6088b7904112def9ec8006ccaaf347112df6e87a
+product_6a98631f724b09.44754033.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98631f724b09.44754033.png | 8e4f1bddd8f0a61f1178f44801e4a42d5c58dee0
+product_6a98631f72dfb6.33277882.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98631f72dfb6.33277882.png | 23f4efcc4426daac5d748ab0c127019887a1cc4e
+product_6a98640068c137.35805380.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98640068c137.35805380.png | e1c9ff9d78727ec2f3caebf9cc5a40808b9dea99
+product_6a986400698754.32942245.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986400698754.32942245.png | 871972794f2867f36dbae106b823edaf173f7929
+product_6a98640069ee04.31614441.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98640069ee04.31614441.png | d5a2a612a2b4c683665c770b9d69639a1cd392ce
+product_6a98651687cf11.69222498.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98651687cf11.69222498.png | aad82eb6685f4ad5f0f01ae75ae935abff0737cf
+product_6a986516882b44.40727235.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986516882b44.40727235.png | e060fe70b9051598ce48244c38063f404549a007
+product_6a986516891367.22273187.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986516891367.22273187.png | b6f2e554ef3f50339155b9262c32495a0b89d992
+product_6a986618d72f73.70024488.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986618d72f73.70024488.png | 67645be5f4ee1782a1d03d603c862c3f852ae031
+product_6a986618d7d0e0.96447724.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986618d7d0e0.96447724.png | c5524f083c5e7386807b7d025f03cdbed517e024
+product_6a986618d88283.71645322.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986618d88283.71645322.png | 2485a27110becd253c2200d73d6b204e6b7e1de7
+product_6a98673bf1ea35.77981183.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98673bf1ea35.77981183.png | 8f40801a80fa0f426eee09a8e3e48e4b9542ca08
+product_6a98673bf2ced3.46234709.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98673bf2ced3.46234709.png | 0b642b7c4f1b8084cdb04dda79b53280655b69fb
+product_6a98673bf35b50.48232313.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98673bf35b50.48232313.png | dc58d959290dadeb95533f8f1a7a74a49ea2bb86
+product_6a9868204a92d6.00484552.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9868204a92d6.00484552.png | 6e87d90ea153d025a0541e98012827dd5e6a9381
+product_6a9868204b2f91.83454540.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9868204b2f91.83454540.png | 9137336bea751c101986d1ba877945aca52481b7
+product_6a9868204bb4c1.74463051.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a9868204bb4c1.74463051.png | 0260b68670d6413b0a5edcba8a65c5a9325f0fec
+product_6a98695e1634f1.44399889.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98695e1634f1.44399889.png | 7ad0c550bab8d13595ce931c3f339aff5d8b1ddc
+product_6a98695e16ddf6.29933390.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98695e16ddf6.29933390.png | 9b23d9012aeb638b42933b33a3df3908dbd6f058
+product_6a98695e1765b8.55987005.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a98695e1765b8.55987005.png | 516b84d740b8aa3cc130a1907aed886e51a7c287
+product_6a986ae76239f8.30449159.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986ae76239f8.30449159.png | 33f106379149a692b8dd32cce6de1ff88dadfb46
+product_6a986ae7630146.04154501.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986ae7630146.04154501.png | 28f08b608c1bc1da502bf5a1e36195c7631fecef
+product_6a986ae763b4f6.60726626.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986ae763b4f6.60726626.png | 2d53653b576b6f921fa31a0d7aea087abecd8163
+product_6a986be5059215.98914812.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986be5059215.98914812.png | f449d717b4bcb7c61bfe38b17f60f274c66c4fe3
+product_6a986be5060ea1.97978331.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986be5060ea1.97978331.png | 25b973db13681be528e866f169e3813c95d4f11c
+product_6a986be5068ca1.28492868.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986be5068ca1.28492868.png | e3ae4db1c45460a03ec35dce5680af0af87a47ac
+product_6a986cbe112604.34251499.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986cbe112604.34251499.png | 5642d1ce7e8f783c85b11d9fa5b8911ead6517d7
+product_6a986cbe11a100.63309749.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986cbe11a100.63309749.png | d8a502975a0780d6f68aa12242ac4c5127fb48c9
+product_6a986cbe1232c5.93664382.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986cbe1232c5.93664382.png | f67f8f5ca4331c2589c477c190393ce442a19134
+product_6a986d819c3a55.44172250.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986d819c3a55.44172250.png | a033f5099fcb5a3d3facc128e5561b206c1a924e
+product_6a986d819cc2e4.88643165.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986d819cc2e4.88643165.png | 536a0c22cc598589aa68632d266bf6675510c4b5
+product_6a986d819d3858.33715931.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986d819d3858.33715931.png | 855caedabfc0f136b3ced8ae2261b9a368b0c737
+product_6a986f13a8f511.10296886.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986f13a8f511.10296886.png | adc7dd540740216e30f121c5883905316e49be39
+product_6a986f13a98953.94767416.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986f13a98953.94767416.png | 2c91e740e231d9eab1523945a4492a19aa53fbf2
+product_6a986f13aa05d3.54848040.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a986f13aa05d3.54848040.png | f086edf8d20d5e3526fa4b215a7058a946f339d7
+product_6a99b070a12412.72568956.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a99b070a12412.72568956.png | 37663b5e4a4b60c73a7a5455b99ac91ec2f5346d
+product_6a99b070a21d35.54697734.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a99b070a21d35.54697734.png | 571f17ed884ed3512de6c06b54698659334e4d61
+product_6a99b070a2c740.46238625.png
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a99b070a2c740.46238625.png | 5d99ad59786e043cc2f6c245d07e8f344c168fcc
+product_6a99b086a07de1.34389903.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a99b086a07de1.34389903.jpg | 8b5c0811535aaed47986582a9dd8209968c456bf
+product_6a99b1736d1c74.02476069.jpg
+  <- GIT: C:\xampp\htdocs\FashionShop-Group | uploads/product_6a99b1736d1c74.02476069.jpg | 31a472de619484bd6c97e8862277bc9ffb8c314a
+
+===== CON THIEU ANH THAT =====
+product_6a944e45c52727.60503924.jpg
+product_6a94529ff03f18.76075287.jpg
+product_6a9508ae04bf83.34670908.jpg
+product_6a950aaf10afa0.76117007.jpg
+product_6a950e8a11a864.03046700.jpg
+product_6a9512f5c16330.23297903.jpg
+product_6a95140471c7f4.74734751.jpg
+product_6a9858aa2ef565.22159010.jpg
+product_6a985c0055d946.38541969.jpg
+product_6a985d803f5fa5.21521117.jpg
+product_6a985eeaaaf154.24785989.jpg
+product_6a986039e038e0.29001255.jpg
+product_6a9861c9418646.67561029.jpg
+product_6a98635da88eb4.80258630.jpg
+product_6a98641cccba94.25676011.jpg
+product_6a98653028c036.72339565.jpg
+product_6a986636886763.13351657.jpg
+product_6a98674ca7dcc7.24997089.jpg
+product_6a98684339f309.49459753.jpg
+product_6a98694444a761.61363746.jpg
+product_6a986af6df5422.18319235.jpg
+product_6a986bffc048d3.78339114.jpg
+product_6a986cd003e631.06943428.jpg

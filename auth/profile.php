@@ -3,7 +3,7 @@
 require_once '../config/database.php';
 require_once 'auth_check.php';
 
-require_login();
+requireLogin();
 
 $user_id = $_SESSION['user']['id'];
 

@@ -38,7 +38,7 @@
 
 <!-- === FLOATING ZALO START === -->
 <a
-    href="https://zalo.me/g/juaxctm7cvtayvvaq3g9"
+    href="https://zalo.me/0336720624"
     class="floating-zalo"
     target="_blank"
     rel="noopener noreferrer"

@@ -1,0 +1,88 @@
+==============================================
+FASHIONSHOP - NGAN FEATURES V2
+==============================================
+
+DATABASE: fashion_shop
+SOURCE COLUMNS: id, category_id, name, slug, price, original_price, description, image, gallery, status, created_at, stock, size, color, material
+SOURCE TUPLES: 19
+
+===== VALIDATE MAPPING =====
+OK old=1 -> new=33 | Áo thun cổ V xẻ viền chỉ
+OK old=4 -> new=34 | Áo Thun Ringer L'oeil Studio Vintage
+OK old=5 -> new=35 | Áo Thun Baby Tee
+OK old=6 -> new=36 | Đầm Chấm Bi Lệch Vai
+OK old=7 -> new=37 | Đầm Yếm Nữ Đen Phối Áo Sơ Mi Trắng
+OK old=8 -> new=38 | Đồ Nữ Áo Sơ Mi Peplum Tay Bồng Hồng
+OK old=9 -> new=39 | Chân Váy Ngắn Chữ A Cạp Cao
+OK old=10 -> new=40 | Chân Váy Ngắn Màu Kem Be Nữ
+OK old=11 -> new=41 | Chân Váy Dài Nữ Dáng A Xòe
+OK old=12 -> new=42 | Quần Short Tây Nữ
+OK old=13 -> new=43 | Quần Tây Nữ Ống Rộng
+OK old=14 -> new=44 | Quần Tây Nữ Cạp Cao Phối Viền
+OK old=15 -> new=45 | Quần Cargo Nữ Ống Rộng
+OK old=16 -> new=46 | Áo Khoác Len Cardigan Nữ
+OK old=17 -> new=47 | Áo Khoác Len Cardigan Nữ Cổ Bẻ
+OK old=18 -> new=48 | Cardigan Nữ Dệt Kim
+OK old=19 -> new=49 | Cardigan Nữ Cổ V Dệt Kim
+OK old=22 -> new=50 | Quần Dù Ống Suông
+OK old=23 -> new=51 | Quần Tây Ống Rộng
+
+BACKUP: OK
+C:/xampp/htdocs/FashionShop-Group/database/backup_before_ngan_features_v2_20260908-144045.json
+
+===== DATABASE SCHEMA =====
+ADD size: OK
+ADD color: OK
+ADD material: OK
+
+===== UPDATE 19 PRODUCTS =====
+ID 33 | Áo thun cổ V xẻ viền chỉ | SIZE=S,M,L,XL,XXL | MAU=be | CHAT LIEU=Cotton
+ID 34 | Áo Thun Ringer L'oeil Studio Vintage | SIZE=S,M,L,XL | MAU=trắng | CHAT LIEU=Cotton
+ID 35 | Áo Thun Baby Tee | SIZE=S,M,L | MAU=hồng | CHAT LIEU=Cotton
+ID 36 | Đầm Chấm Bi Lệch Vai | SIZE=S,M,L,XL,XXL | MAU=xám | CHAT LIEU=Kaki thun cao cấp
+ID 37 | Đầm Yếm Nữ Đen Phối Áo Sơ Mi Trắng | SIZE=S,M,L,XL,XXL | MAU=đen | CHAT LIEU=Kaki thun cao cấp
+ID 38 | Đồ Nữ Áo Sơ Mi Peplum Tay Bồng Hồng | SIZE=S,M,L,XL | MAU=hồng đen | CHAT LIEU=Kaki thun cao cấp
+ID 39 | Chân Váy Ngắn Chữ A Cạp Cao | SIZE=S,M,L,XXL | MAU=be | CHAT LIEU=kaki
+ID 40 | Chân Váy Ngắn Màu Kem Be Nữ | SIZE=S,M,L | MAU=trắng | CHAT LIEU=kaki thun
+ID 41 | Chân Váy Dài Nữ Dáng A Xòe | SIZE=S,M,L,XL,XXL | MAU=be | CHAT LIEU=kaki thun cao cấp
+ID 42 | Quần Short Tây Nữ | SIZE=S,M,L,XL,XXL | MAU=nâu | CHAT LIEU=Kaki cao cấp
+ID 43 | Quần Tây Nữ Ống Rộng | SIZE=S,M,L,XL,XXL | MAU=nâu | CHAT LIEU=vân đũi cao cấp
+ID 44 | Quần Tây Nữ Cạp Cao Phối Viền | SIZE=S,M,L,XL | MAU=xám | CHAT LIEU=tây cao cấp
+ID 45 | Quần Cargo Nữ Ống Rộng | SIZE=S,M,L,XL | MAU=trắng | CHAT LIEU=kaki thô mỏng
+ID 46 | Áo Khoác Len Cardigan Nữ | SIZE=S,M,L,XL,XXL | MAU=kem bơ | CHAT LIEU=len dệt kim cao cấp
+ID 47 | Áo Khoác Len Cardigan Nữ Cổ Bẻ | SIZE=S,M,L,XL,XXL | MAU=Nâu Socola | CHAT LIEU=len dệt cao cấp
+ID 48 | Cardigan Nữ Dệt Kim | SIZE=S,M,L,XL | MAU=Đỏ | CHAT LIEU=len dệt cao cấp
+ID 49 | Cardigan Nữ Cổ V Dệt Kim | SIZE=[TRONG] | MAU=xám | CHAT LIEU=len dệt kim trơn mịn
+ID 50 | Quần Dù Ống Suông | SIZE=S,M,L,XL,XXL | MAU=xám | CHAT LIEU=vải dù
+ID 51 | Quần Tây Ống Rộng | SIZE=S,M,L,XXL | MAU=đen | CHAT LIEU=Kaki thun cao cấp
+
+===== VERIFY EXACT =====
+[OK] ID 33 | Áo thun cổ V xẻ viền chỉ
+[OK] ID 34 | Áo Thun Ringer L'oeil Studio Vintage
+[OK] ID 35 | Áo Thun Baby Tee
+[OK] ID 36 | Đầm Chấm Bi Lệch Vai
+[OK] ID 37 | Đầm Yếm Nữ Đen Phối Áo Sơ Mi Trắng
+[OK] ID 38 | Đồ Nữ Áo Sơ Mi Peplum Tay Bồng Hồng
+[OK] ID 39 | Chân Váy Ngắn Chữ A Cạp Cao
+[OK] ID 40 | Chân Váy Ngắn Màu Kem Be Nữ
+[OK] ID 41 | Chân Váy Dài Nữ Dáng A Xòe
+[OK] ID 42 | Quần Short Tây Nữ
+[OK] ID 43 | Quần Tây Nữ Ống Rộng
+[OK] ID 44 | Quần Tây Nữ Cạp Cao Phối Viền
+[OK] ID 45 | Quần Cargo Nữ Ống Rộng
+[OK] ID 46 | Áo Khoác Len Cardigan Nữ
+[OK] ID 47 | Áo Khoác Len Cardigan Nữ Cổ Bẻ
+[OK] ID 48 | Cardigan Nữ Dệt Kim
+[OK] ID 49 | Cardigan Nữ Cổ V Dệt Kim
+[OK] ID 50 | Quần Dù Ống Suông
+[OK] ID 51 | Quần Tây Ống Rộng
+
+Tong product : 19
+Co size      : 18
+Co mau       : 19
+Co chat lieu : 19
+Sai du lieu  : 0
+
+==============================================
+TICH HOP SIZE / MAU / CHAT LIEU: THANH CONG
+==============================================

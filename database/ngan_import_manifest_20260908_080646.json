@@ -1,0 +1,135 @@
+{
+    "1": {
+        "new_id": 33,
+        "name": "Áo thun cổ V xẻ viền chỉ",
+        "category": "Áo",
+        "price": 174000,
+        "main_image": "uploads/products/ngan/product_6a94529ff03f18.76075287.jpg"
+    },
+    "4": {
+        "new_id": 34,
+        "name": "Áo Thun Ringer L'oeil Studio Vintage",
+        "category": "Áo",
+        "price": 185000,
+        "main_image": "uploads/products/ngan/product_6a9858aa2ef565.22159010.jpg"
+    },
+    "5": {
+        "new_id": 35,
+        "name": "Áo Thun Baby Tee",
+        "category": "Áo",
+        "price": 179000,
+        "main_image": "uploads/products/ngan/product_6a985c0055d946.38541969.jpg"
+    },
+    "6": {
+        "new_id": 36,
+        "name": "Đầm Chấm Bi Lệch Vai",
+        "category": "Váy",
+        "price": 300000,
+        "main_image": "uploads/products/ngan/product_6a985d803f5fa5.21521117.jpg"
+    },
+    "7": {
+        "new_id": 37,
+        "name": "Đầm Yếm Nữ Đen Phối Áo Sơ Mi Trắng",
+        "category": "Váy",
+        "price": 325000,
+        "main_image": "uploads/products/ngan/product_6a985eeaaaf154.24785989.jpg"
+    },
+    "8": {
+        "new_id": 38,
+        "name": "Đồ Nữ Áo Sơ Mi Peplum Tay Bồng Hồng",
+        "category": "Áo",
+        "price": 324000,
+        "main_image": "uploads/products/ngan/product_6a986039e038e0.29001255.jpg"
+    },
+    "9": {
+        "new_id": 39,
+        "name": "Chân Váy Ngắn Chữ A Cạp Cao",
+        "category": "Chân váy",
+        "price": 199000,
+        "main_image": "uploads/products/ngan/product_6a9861c9418646.67561029.jpg"
+    },
+    "10": {
+        "new_id": 40,
+        "name": "Chân Váy Ngắn Màu Kem Be Nữ",
+        "category": "Chân váy",
+        "price": 198000,
+        "main_image": "uploads/products/ngan/product_6a98635da88eb4.80258630.jpg"
+    },
+    "11": {
+        "new_id": 41,
+        "name": "Chân Váy Dài Nữ Dáng A Xòe",
+        "category": "Chân váy",
+        "price": 325000,
+        "main_image": "uploads/products/ngan/product_6a98641cccba94.25676011.jpg"
+    },
+    "12": {
+        "new_id": 42,
+        "name": "Quần Short Tây Nữ",
+        "category": "Quần",
+        "price": 185000,
+        "main_image": "uploads/products/ngan/product_6a98653028c036.72339565.jpg"
+    },
+    "13": {
+        "new_id": 43,
+        "name": "Quần Tây Nữ Ống Rộng",
+        "category": "Quần",
+        "price": 350000,
+        "main_image": "uploads/products/ngan/product_6a986636886763.13351657.jpg"
+    },
+    "14": {
+        "new_id": 44,
+        "name": "Quần Tây Nữ Cạp Cao Phối Viền",
+        "category": "Quần",
+        "price": 389000,
+        "main_image": "uploads/products/ngan/product_6a98674ca7dcc7.24997089.jpg"
+    },
+    "15": {
+        "new_id": 45,
+        "name": "Quần Cargo Nữ Ống Rộng",
+        "category": "Quần",
+        "price": 265000,
+        "main_image": "uploads/products/ngan/product_6a98684339f309.49459753.jpg"
+    },
+    "16": {
+        "new_id": 46,
+        "name": "Áo Khoác Len Cardigan Nữ",
+        "category": "Cardigan",
+        "price": 650000,
+        "main_image": "uploads/products/ngan/product_6a98694444a761.61363746.jpg"
+    },
+    "17": {
+        "new_id": 47,
+        "name": "Áo Khoác Len Cardigan Nữ Cổ Bẻ",
+        "category": "Cardigan",
+        "price": 650000,
+        "main_image": "uploads/products/ngan/product_6a986af6df5422.18319235.jpg"
+    },
+    "18": {
+        "new_id": 48,
+        "name": "Cardigan Nữ Dệt Kim",
+        "category": "Cardigan",
+        "price": 600000,
+        "main_image": "uploads/products/ngan/product_6a986bffc048d3.78339114.jpg"
+    },
+    "19": {
+        "new_id": 49,
+        "name": "Cardigan Nữ Cổ V Dệt Kim",
+        "category": "Cardigan",
+        "price": 600000,
+        "main_image": "uploads/products/ngan/product_6a986cd003e631.06943428.jpg"
+    },
+    "22": {
+        "new_id": 50,
+        "name": "Quần Dù Ống Suông",
+        "category": "Quần",
+        "price": 325000,
+        "main_image": "uploads/products/ngan/product_6a99b086a07de1.34389903.jpg"
+    },
+    "23": {
+        "new_id": 51,
+        "name": "Quần Tây Ống Rộng",
+        "category": "Quần",
+        "price": 325000,
+        "main_image": "uploads/products/ngan/product_6a99b1736d1c74.02476069.jpg"
+    }
+}

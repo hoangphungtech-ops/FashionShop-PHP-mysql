@@ -78,5 +78,25 @@ $flash = pull_admin_flash();
         </table>
     </div>
 </main>
+
+<!-- === FULL ORDERS ADMIN LINK START === -->
+<a
+    href="../orders-full/index.php"
+    style="
+        position:fixed;
+        right:24px;
+        bottom:24px;
+        z-index:9999;
+        padding:12px 18px;
+        background:#173b2e;
+        color:#fff;
+        text-decoration:none;
+        font-weight:700;
+    "
+>
+    Đơn hàng đầy đủ →
+</a>
+<!-- === FULL ORDERS ADMIN LINK END === -->
+
 </body>
 </html>

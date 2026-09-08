@@ -297,5 +297,51 @@ $flash = pull_admin_flash();
 
 </div>
 
+
+<!-- === PRODUCT OPTIONS ADMIN LINK START === -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    document
+        .querySelectorAll('a[href*="edit.php?id="]')
+        .forEach(function (editLink) {
+
+            var match =
+                editLink
+                    .getAttribute('href')
+                    .match(/id=(\d+)/);
+
+            if (!match) {
+                return;
+            }
+
+            var id =
+                match[1];
+
+            var link =
+                document.createElement('a');
+
+            link.href =
+                'options.php?id='
+                + id;
+
+            link.textContent =
+                'Size / Màu';
+
+            link.style.marginLeft =
+                '8px';
+
+            link.style.fontWeight =
+                '600';
+
+            editLink.insertAdjacentElement(
+                'afterend',
+                link
+            );
+        });
+});
+</script>
+<!-- === PRODUCT OPTIONS ADMIN LINK END === -->
+
 </body>
 </html>

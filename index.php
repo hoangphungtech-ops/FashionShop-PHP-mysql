@@ -1,44 +1,56 @@
 <?php
+
 require_once __DIR__ . "/includes/db.php";
 require_once __DIR__ . "/includes/auth.php";
 
 /* =========================
-   LẤY SẢN PHẨM
+   GET PRODUCTS
 ========================= */
 
 $products = [];
 
 try {
-    $stmt = $pdo->query("
-        SELECT *
-        FROM products
-        WHERE status = 1
-        ORDER BY id DESC
-        LIMIT 6
-    ");
+
+    $sql = "SELECT * FROM products
+            WHERE status = 1
+            ORDER BY id DESC
+            LIMIT 6";
+
+    $stmt = $pdo->query($sql);
 
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
+
     $products = [];
+
 }
 
 
 /* =========================
-   LẤY ẢNH SẢN PHẨM
+   PRODUCT IMAGE
 ========================= */
 
 function getProductImage($image)
 {
     $image = trim($image ?? '');
 
+    /* Không có ảnh */
     if ($image === '') {
         return 'assets/images/ao-thun.jpg';
     }
 
+    /* Nếu database lưu URL */
     if (filter_var($image, FILTER_VALIDATE_URL)) {
         return $image;
     }
+
+    /*
+        Nếu database chỉ lưu tên file
+
+        Ví dụ:
+        ao-thun.jpg
+    */
 
     $uploadPath = __DIR__ . "/uploads/products/" . $image;
 
@@ -46,109 +58,77 @@ function getProductImage($image)
         return "uploads/products/" . $image;
     }
 
+
+    /*
+        Trường hợp ảnh nằm trong assets/images
+    */
+
     $assetPath = __DIR__ . "/assets/images/" . $image;
 
     if (file_exists($assetPath)) {
         return "assets/images/" . $image;
     }
 
+
+    /*
+        Nếu database đã lưu sẵn đường dẫn
+    */
+
     if (file_exists(__DIR__ . "/" . $image)) {
         return $image;
     }
 
+
+    /* Ảnh mặc định */
+
     return "assets/images/ao-thun.jpg";
 }
+
 ?>
 
+
 <!DOCTYPE html>
+
 <html lang="vi">
 
 <head>
 
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
     <title>Fashion Shop</title>
 
-<<<<<<< HEAD
     <link rel="stylesheet"
           href="assets/css/style.css?v=20260831-7">
-=======
-    <!-- Thêm version để trình duyệt không giữ CSS cũ -->
-    <link
-        rel="stylesheet"
-        href="assets/css/style.css?v=20260831"
-    >
->>>>>>> origin/GiaoDien-Nghi
 
 </head>
+
 
 <body class="home-page">
 
 
-<!-- =====================================================
-     TOP BAR
-===================================================== -->
-
-<div class="top-bar">
-
-    <div class="container top-bar-inner">
-
-        <span>
-            MIỄN PHÍ VẬN CHUYỂN CHO ĐƠN HÀNG TỪ 500.000Đ
-        </span>
-
-        <span>
-            FASHION SHOP
-        </span>
-
-    </div>
-
-</div>
-
-
-<!-- =====================================================
+<!-- =========================
      HEADER
-===================================================== -->
+========================= -->
 
 <header class="header">
 
     <div class="container header-content">
 
 
-        <!-- LOGO -->
+        <a href="index.php"
+           class="logo">
 
-<<<<<<< HEAD
             Fashion<span>Shop</span>
-=======
-        <a href="index.php" class="logo">
-
-            <span>FASHION</span>
-
-            <strong>SHOP</strong>
->>>>>>> origin/GiaoDien-Nghi
 
         </a>
 
 
-<<<<<<< HEAD
         <nav class="nav">
 
             <a href="index.php">
-=======
-        <!-- NAV -->
-
-        <nav
-            class="nav"
-            id="primary-navigation"
-        >
-
-            <a
-                href="index.php"
-                class="active"
-            >
->>>>>>> origin/GiaoDien-Nghi
                 Trang chủ
             </a>
 
@@ -171,97 +151,21 @@ function getProductImage($image)
         </nav>
 
 
-<<<<<<< HEAD
         <div style="display: flex; gap: 10px;">
-=======
-        <!-- ACTION -->
-
-        <div class="header-actions">
-
-
-            <a
-                href="auth/profile.php"
-                class="header-action"
-                title="Tài khoản"
-            >
-
-                <svg viewBox="0 0 24 24">
-
-                    <circle
-                        cx="12"
-                        cy="8"
-                        r="4"
-                    ></circle>
-
-                    <path
-                        d="M4 21a8 8 0 0 1 16 0"
-                    ></path>
-
-                </svg>
-
-                <span>
-                    Tài khoản
-                </span>
->>>>>>> origin/GiaoDien-Nghi
 
             <a href="<?= is_logged_in() ? 'auth/profile.php' : 'auth/login.php' ?>">
                 <?= is_logged_in() ? 'Tài khoản' : 'Đăng nhập/Đăng ký' ?>
             </a>
 
 
-<<<<<<< HEAD
             <a href="cart/index.php"
                class="cart">
 
                 Giỏ hàng
 
                 <span>0</span>
-=======
-            <a
-                href="cart/index.php"
-                class="header-action cart"
-                title="Giỏ hàng"
-            >
-
-                <svg viewBox="0 0 24 24">
-
-                    <path
-                        d="M6 8h12l1 13H5L6 8Z"
-                    ></path>
-
-                    <path
-                        d="M9 9V6a3 3 0 0 1 6 0v3"
-                    ></path>
-
-                </svg>
-
-                <span>
-                    Giỏ hàng
-                </span>
-
-                <b class="cart-count">
-                    0
-                </b>
->>>>>>> origin/GiaoDien-Nghi
 
             </a>
-
-
-            <!-- MOBILE -->
-
-            <button
-                class="menu-toggle"
-                type="button"
-                aria-label="Mở menu"
-                aria-controls="primary-navigation"
-                aria-expanded="false"
-            >
-
-                <span></span>
-                <span></span>
-                <span></span>
-
-            </button>
 
         </div>
 
@@ -271,48 +175,47 @@ function getProductImage($image)
 
 
 
-<!-- =====================================================
-     HERO BANNER
-===================================================== -->
+<!-- =========================
+     HERO
+========================= -->
 
 <section class="hero">
 
-    <div class="hero-background"></div>
-
-    <div class="container hero-inner">
+    <div class="container hero-content">
 
 
-        <div class="hero-copy">
+        <div class="hero-text">
 
-            <div class="hero-label">
-                NEW COLLECTION 2026
+            <div class="small-title">
+                FASHION SHOP
             </div>
 
 
             <h1>
 
-                Mặc đẹp.
+                Thời trang
 
-                <br>
-
-                <span>Sống chất.</span>
+                <span>
+                    dành cho bạn
+                </span>
 
             </h1>
 
 
             <p>
-                Khám phá bộ sưu tập thời trang
-                trẻ trung, hiện đại và thanh lịch
-                dành riêng cho phong cách của bạn.
+
+                Khám phá những thiết kế thời trang
+                trẻ trung, hiện đại và thanh lịch.
+                Tìm cho mình phong cách phù hợp
+                với cá tính riêng của bạn.
+
             </p>
 
 
-            <a
-                href="products/index.php"
-                class="hero-button"
-            >
+            <a href="products/index.php"
+               class="btn">
 
-                KHÁM PHÁ NGAY
+                Khám phá sản phẩm
 
                 <span>→</span>
 
@@ -322,7 +225,6 @@ function getProductImage($image)
             <div class="hero-meta"
                  aria-label="Thông tin bộ sưu tập">
 
-<<<<<<< HEAD
                 <span>✦ NEW COLLECTION</span>
 
                 <span>MEN &amp; WOMEN</span>
@@ -375,41 +277,30 @@ function getProductImage($image)
 
         </div>
 
-=======
-        <div class="hero-picture">
-
-            <img
-                src="assets/images/vay-nu-thanh-lich.jpg"
-                alt="Bộ sưu tập thời trang"
-            >
-
-        </div>
-
->>>>>>> origin/GiaoDien-Nghi
     </div>
 
 </section>
 
 
 
-<!-- =====================================================
-     COLLECTION / PRODUCTS
-===================================================== -->
+<!-- =========================
+     PRODUCTS
+========================= -->
 
-<section class="collection">
+<section class="products">
 
     <div class="container">
 
 
-        <!-- TITLE -->
+        <div class="section-header">
 
-        <div class="collection-title">
 
             <div>
 
-                <span class="eyebrow">
+                <div class="small-title">
                     OUR COLLECTION
-                </span>
+                </div>
+
 
                 <h2>
                     Sản phẩm nổi bật
@@ -418,158 +309,121 @@ function getProductImage($image)
             </div>
 
 
-            <a
-                href="products/index.php"
-                class="all-products"
-            >
-                XEM TẤT CẢ
-                <span>→</span>
+            <a href="products/index.php"
+               class="view-all">
+
+                Xem tất cả →
+
             </a>
+
 
         </div>
 
 
-        <!-- PRODUCT BOX -->
 
-        <div class="product-showcase">
-
-
-            <div class="showcase-heading">
-
-                <span>
-                    FEATURED PRODUCTS
-                </span>
-
-                <span>
-                    2026
-                </span>
-
-            </div>
+        <div class="product-grid">
 
 
-            <div class="product-grid">
+            <?php if (!empty($products)): ?>
 
 
-                <?php if (!empty($products)): ?>
+                <?php foreach ($products as $product): ?>
 
 
-                    <?php foreach ($products as $index => $product): ?>
+                    <?php
 
-                        <?php
-                        $image = getProductImage(
-                            $product['image'] ?? ''
-                        );
-                        ?>
+                    $image = getProductImage(
+                        $product['image'] ?? ''
+                    );
 
-
-                        <article class="product-card">
+                    ?>
 
 
-                            <a
-                                href="products/detail.php?id=<?= (int)$product['id'] ?>"
-                                class="product-image"
+                    <div class="product-card">
+
+
+                        <a
+                            href="products/detail.php?id=<?= (int)$product['id'] ?>"
+                            class="product-image"
+                        >
+
+                            <span class="new">
+                                NEW
+                            </span>
+
+
+                            <img
+                                src="<?= htmlspecialchars($image) ?>"
+                                alt="<?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>"
                             >
 
-                                <span class="product-number">
-                                    0<?= $index + 1 ?>
-                                </span>
+                        </a>
 
 
-                                <span class="new-badge">
-                                    NEW
-                                </span>
+
+                        <div class="product-info">
 
 
-                                <img
-                                    src="<?= htmlspecialchars($image) ?>"
-                                    alt="<?= htmlspecialchars($product['name'] ?? 'Sản phẩm') ?>"
+                            <small>
+                                FASHION
+                            </small>
+
+
+                            <h3>
+
+                                <a
+                                    href="products/detail.php?id=<?= (int)$product['id'] ?>"
                                 >
 
+                                    <?= htmlspecialchars(
+                                        $product['name'] ?? 'Sản phẩm'
+                                    ) ?>
 
-                                <span class="view-product">
-                                    XEM SẢN PHẨM →
-                                </span>
+                                </a>
 
-                            </a>
-
-
-                            <div class="product-info">
+                            </h3>
 
 
-                                <div class="product-category">
-                                    FASHION COLLECTION
-                                </div>
+                            <div class="price">
 
-
-                                <h3>
-
-                                    <a
-                                        href="products/detail.php?id=<?= (int)$product['id'] ?>"
-                                    >
-
-                                        <?= htmlspecialchars(
-                                            $product['name'] ?? 'Sản phẩm'
-                                        ) ?>
-
-                                    </a>
-
-                                </h3>
-
-
-                                <div class="product-bottom">
-
-                                    <strong class="price">
-
-                                        <?= number_format(
-                                            (float)($product['price'] ?? 0),
-                                            0,
-                                            ',',
-                                            '.'
-                                        ) ?>đ
-
-                                    </strong>
-
-
-                                    <a
-                                        href="products/detail.php?id=<?= (int)$product['id'] ?>"
-                                        class="product-arrow"
-                                    >
-                                        →
-                                    </a>
-
-                                </div>
+                                <?= number_format(
+                                    (float)($product['price'] ?? 0),
+                                    0,
+                                    ',',
+                                    '.'
+                                ) ?>đ
 
                             </div>
 
-                        </article>
 
-
-                    <?php endforeach; ?>
-
-
-                <?php else: ?>
-
-
-                    <div class="empty-products">
-
-                        <div class="empty-icon">
-                            ♡
                         </div>
-
-                        <h3>
-                            Chưa có sản phẩm
-                        </h3>
-
-                        <p>
-                            Hiện tại chưa có sản phẩm để hiển thị.
-                        </p>
 
                     </div>
 
 
-                <?php endif; ?>
+                <?php endforeach; ?>
 
-            </div>
+
+            <?php else: ?>
+
+
+                <!-- Nếu database chưa có sản phẩm -->
+
+                <div class="empty-products">
+
+                    <h3>
+                        Chưa có sản phẩm
+                    </h3>
+
+                    <p>
+                        Hiện tại chưa có sản phẩm để hiển thị.
+                    </p>
+
+                </div>
+
+
+            <?php endif; ?>
+
 
         </div>
 
@@ -579,113 +433,34 @@ function getProductImage($image)
 
 
 
-<!-- =====================================================
-     CATEGORY BANNER
-===================================================== -->
-
-<section class="category-section">
-
-    <div class="container category-grid">
-
-
-        <a
-            href="products/index.php?category=1"
-            class="category-card category-shirt"
-        >
-
-            <div>
-
-                <span>
-                    COLLECTION 01
-                </span>
-
-                <h3>
-                    Áo
-                </h3>
-
-                <small>
-                    KHÁM PHÁ →
-                </small>
-
-            </div>
-
-        </a>
-
-
-        <a
-            href="products/index.php?category=2"
-            class="category-card category-pants"
-        >
-
-            <div>
-
-                <span>
-                    COLLECTION 02
-                </span>
-
-                <h3>
-                    Quần
-                </h3>
-
-                <small>
-                    KHÁM PHÁ →
-                </small>
-
-            </div>
-
-        </a>
-
-
-        <a
-            href="products/index.php?category=3"
-            class="category-card category-dress"
-        >
-
-            <div>
-
-                <span>
-                    COLLECTION 03
-                </span>
-
-                <h3>
-                    Váy
-                </h3>
-
-                <small>
-                    KHÁM PHÁ →
-                </small>
-
-            </div>
-
-        </a>
-
-    </div>
-
-</section>
-
-
-
-<!-- =====================================================
-     WHY CHOOSE US
-===================================================== -->
+<!-- =========================
+     WHY
+========================= -->
 
 <section class="why">
 
-    <div class="container">
+    <div class="container why-content">
 
 
-        <div class="why-heading">
+        <div>
 
-            <span class="eyebrow">
-                WHY FASHION SHOP
-            </span>
+            <div class="small-title">
+                WHY CHOOSE US?
+            </div>
+
 
             <h2>
+
                 Đẹp theo cách
-                <span>của bạn.</span>
+
+                <br>
+
+                của bạn.
+
             </h2>
 
         </div>
+
 
 
         <div class="features">
@@ -693,70 +468,62 @@ function getProductImage($image)
 
             <div class="feature">
 
-                <span class="feature-number">
+                <div class="number">
                     01
-                </span>
-
-                <div>
-
-                    <h3>
-                        Chất lượng tốt
-                    </h3>
-
-                    <p>
-                        Sản phẩm được lựa chọn
-                        kỹ càng, phù hợp để sử dụng
-                        hằng ngày.
-                    </p>
-
                 </div>
+
+                <h3>
+                    Chất lượng tốt
+                </h3>
+
+                <p>
+                    Sản phẩm được lựa chọn
+                    kỹ càng và phù hợp
+                    để sử dụng hằng ngày.
+                </p>
 
             </div>
 
 
+
             <div class="feature">
 
-                <span class="feature-number">
+                <div class="number">
                     02
-                </span>
-
-                <div>
-
-                    <h3>
-                        Thiết kế hiện đại
-                    </h3>
-
-                    <p>
-                        Kiểu dáng trẻ trung,
-                        dễ phối đồ và phù hợp
-                        với nhiều phong cách.
-                    </p>
-
                 </div>
 
+                <h3>
+                    Thiết kế hiện đại
+                </h3>
+
+                <p>
+                    Kiểu dáng trẻ trung,
+                    dễ phối đồ và phù hợp
+                    với nhiều phong cách.
+                </p>
+
             </div>
+
 
 
             <div class="feature">
 
-                <span class="feature-number">
+                <div class="number">
                     03
-                </span>
-
-                <div>
-
-                    <h3>
-                        Giao hàng nhanh
-                    </h3>
-
-                    <p>
-                        Đóng gói cẩn thận và giao
-                        hàng đến tận nơi.
-                    </p>
-
                 </div>
 
+                <h3>
+                    Giao hàng nhanh
+                </h3>
+
+                <p>
+                    Đóng gói cẩn thận
+                    và giao hàng đến
+                    tận nơi.
+                </p>
+
             </div>
+
 
         </div>
 
@@ -766,121 +533,13 @@ function getProductImage($image)
 
 
 
-<!-- =====================================================
+<!-- =========================
      FOOTER
-===================================================== -->
+========================= -->
 
-<footer class="footer">
-
-    <div class="container">
+<?php require __DIR__ . '/includes/footer.php'; ?>
 
 
-        <div class="footer-main">
-
-
-            <div class="footer-brand">
-
-                <a href="index.php" class="footer-logo">
-                    FASHION<span>SHOP</span>
-                </a>
-
-                <p>
-                    Thời trang trẻ trung,
-                    hiện đại và phù hợp
-                    với phong cách riêng
-                    của bạn.
-                </p>
-
-            </div>
-
-
-            <div class="footer-column">
-
-                <h4>
-                    DANH MỤC
-                </h4>
-
-                <a href="products/index.php">
-                    Tất cả sản phẩm
-                </a>
-
-                <a href="products/index.php?category=1">
-                    Áo
-                </a>
-
-                <a href="products/index.php?category=2">
-                    Quần
-                </a>
-
-                <a href="products/index.php?category=3">
-                    Váy
-                </a>
-
-            </div>
-
-
-            <div class="footer-column">
-
-                <h4>
-                    HỖ TRỢ
-                </h4>
-
-                <a href="#">
-                    Chính sách đổi trả
-                </a>
-
-                <a href="#">
-                    Vận chuyển
-                </a>
-
-                <a href="#">
-                    Liên hệ
-                </a>
-
-            </div>
-
-
-            <div class="footer-column">
-
-                <h4>
-                    FASHION SHOP
-                </h4>
-
-                <p>
-                    Cảm ơn bạn đã lựa chọn
-                    Fashion Shop.
-                </p>
-
-            </div>
-
-
-        </div>
-
-
-        <div class="footer-bottom">
-
-            <span>
-                © 2026 Fashion Shop
-            </span>
-
-            <span>
-                MADE WITH ♡
-            </span>
-
-        </div>
-
-    </div>
-
-</footer>
-
-
-<<<<<<< HEAD
 </body>
 
-=======
-
-<script src="assets/js/main.js?v=20260831"></script>
-
-</body>
->>>>>>> origin/GiaoDien-Nghi
 </html>
