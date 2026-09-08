@@ -40,3 +40,5 @@ database/FINAL_CART_ORDER_AUDIT_*/
 database/GIT_LOCAL_SAVE_*/
 database/ngan_git_exact_stage/
 database/backup_placeholder_ngan_*/
+database/backup*.json
+database/*-before-*
