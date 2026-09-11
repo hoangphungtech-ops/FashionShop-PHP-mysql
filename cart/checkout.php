@@ -1,785 +1,318 @@
 <?php
 
-require_once __DIR__ . "/../includes/db.php";
+declare(strict_types=1);
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/cart.php';
+
+$cart = cart_quantities();
+
+if ($cart === []) {
+    cart_flash('error', 'Giá» hÃ ng Ä‘ang trá»‘ng.');
+    safe_redirect('index.php', 'index.php', 303);
 }
 
+$receiverName = sanitize_text($_POST['receiver_name'] ?? '', 100);
+$phone = sanitize_text($_POST['phone'] ?? '', 20);
+$address = sanitize_text($_POST['address'] ?? '', 255);
+$error = '';
 
-/* =========================
-   KIỂM TRA GIỎ HÀNG
-========================= */
-
-$cart = $_SESSION['cart'] ?? [];
-
-if (empty($cart)) {
-    header("Location: index.php");
-    exit;
+try {
+    $cartData = load_cart($pdo);
+} catch (PDOException $exception) {
+    error_log('[checkout] Cannot load cart: ' . $exception->getMessage());
+    $cartData = [
+        'cart' => $cart,
+        'items' => [],
+        'missingLines' => [],
+        'missingIds' => [],
+        'total' => 0.0,
+        'canCheckout' => false,
+    ];
+    $error = 'ChÆ°a thá»ƒ kiá»ƒm tra giá» hÃ ng. Vui lÃ²ng thá»­ láº¡i sau.';
 }
 
+if (is_post_request()) {
+    $csrfToken = $_POST['_csrf_token'] ?? null;
 
-/* =========================
-   LẤY SẢN PHẨM
-========================= */
-
-$products = [];
-$total = 0;
-
-$ids = array_keys($cart);
-
-$ids = array_map('intval', $ids);
-
-$ids = array_filter($ids, function ($id) {
-    return $id > 0;
-});
-
-
-if (!empty($ids)) {
-
-    $placeholders = implode(
-        ',',
-        array_fill(0, count($ids), '?')
-    );
-
-    try {
-
-        $sql = "SELECT *
-                FROM products
-                WHERE id IN ($placeholders)
-                AND status = 1";
-
-        $stmt = $pdo->prepare($sql);
-
-        $stmt->execute($ids);
-
-        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    } catch (PDOException $e) {
-
-        die("Lỗi database: " . $e->getMessage());
-
-    }
-}
-
-
-/* =========================
-   TÍNH TỔNG
-========================= */
-
-foreach ($products as $product) {
-
-    $productId = (int)$product['id'];
-
-    $quantity = (int)(
-        $cart[$productId] ?? 0
-    );
-
-    if ($quantity <= 0) {
-        continue;
-    }
-
-    $price = (float)(
-        $product['price'] ?? 0
-    );
-
-    $total += $price * $quantity;
-}
-
-
-/* =========================
-   XỬ LÝ ĐẶT HÀNG
-========================= */
-
-$error = "";
-$success = false;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    $name = trim(
-        $_POST['name'] ?? ''
-    );
-
-    $phone = trim(
-        $_POST['phone'] ?? ''
-    );
-
-    $address = trim(
-        $_POST['address'] ?? ''
-    );
-
-
-    if (
-        $name === '' ||
-        $phone === '' ||
-        $address === ''
-    ) {
-
-        $error = "Vui lòng nhập đầy đủ thông tin.";
-
+    if (!is_string($csrfToken) || !csrf_validate($csrfToken)) {
+        $error = 'PhiÃªn Ä‘áº·t hÃ ng Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng táº£i láº¡i trang.';
+    } elseif ($receiverName === '' || mb_strlen($receiverName, 'UTF-8') < 2) {
+        $error = 'Vui lÃ²ng nháº­p há» vÃ  tÃªn há»£p lá»‡.';
+    } elseif (!preg_match('/^[0-9+().\s-]{8,20}$/', $phone)) {
+        $error = 'Sá»‘ Ä‘iá»‡n thoáº¡i khÃ´ng há»£p lá»‡.';
+    } elseif ($address === '' || mb_strlen($address, 'UTF-8') < 8) {
+        $error = 'Vui lÃ²ng nháº­p Ä‘á»‹a chá»‰ nháº­n hÃ ng Ä‘áº§y Ä‘á»§.';
     } else {
-
         try {
+            $pdo->beginTransaction();
+            $lockedCart = load_cart($pdo, true);
 
-            $userId = $_SESSION['user_id'] ?? null;
+            if ($lockedCart['cart'] === []
+                || !$lockedCart['canCheckout']
+                || count($lockedCart['items']) !== count($lockedCart['cart'])) {
+                throw new DomainException('Giá» hÃ ng cÃ³ sáº£n pháº©m hoáº·c phÃ¢n loáº¡i khÃ´ng há»£p lá»‡, hoáº·c khÃ´ng Ä‘á»§ tá»“n kho.');
+            }
 
+            $totalAmount = number_format((float)$lockedCart['total'], 2, '.', '');
+            $sessionUser = $_SESSION['user'] ?? null;
+            $userId = is_array($sessionUser)
+                ? filter_var($sessionUser['id'] ?? null, FILTER_VALIDATE_INT, [
+                    'options' => ['min_range' => 1],
+                ])
+                : false;
+            $userId = $userId !== false ? (int)$userId : null;
 
-            /* =========================
-               TẠO ĐƠN HÀNG
-            ========================= */
-
-            $sql = "INSERT INTO orders
-                    (
-                        user_id,
-                        receiver_name,
-                        phone,
-                        address,
-                        total_amount,
-                        status
-                    )
-                    VALUES
-                    (
-                        :user_id,
-                        :receiver_name,
-                        :phone,
-                        :address,
-                        :total_amount,
-                        'pending'
-                    )";
-
-            $stmt = $pdo->prepare($sql);
-
-            $stmt->execute([
-
-                ':user_id' =>
-                    $userId,
-
-                ':receiver_name' =>
-                    $name,
-
-                ':phone' =>
-                    $phone,
-
-                ':address' =>
-                    $address,
-
-                ':total_amount' =>
-                    $total
-
+            $orderStatement = $pdo->prepare(
+                'INSERT INTO orders
+                    (user_id, receiver_name, phone, address, total_amount, status)
+                 VALUES
+                    (:user_id, :receiver_name, :phone, :address, :total_amount, :status)'
+            );
+            $orderStatement->execute([
+                ':user_id' => $userId,
+                ':receiver_name' => $receiverName,
+                ':phone' => $phone,
+                ':address' => $address,
+                ':total_amount' => $totalAmount,
+                ':status' => 'pending',
             ]);
 
+            $orderId = (int)$pdo->lastInsertId();
 
-            /* =========================
-               LẤY ID ĐƠN HÀNG
-            ========================= */
+            $itemStatement = $pdo->prepare(
+                'INSERT INTO order_items
+                    (
+                        order_id,
+                        product_id,
+                        product_name,
+                        product_image,
+                        selected_size,
+                        selected_color,
+                        material,
+                        quantity,
+                        price
+                    )
+                 VALUES
+                    (
+                        :order_id,
+                        :product_id,
+                        :product_name,
+                        :product_image,
+                        :selected_size,
+                        :selected_color,
+                        :material,
+                        :quantity,
+                        :price
+                    )'
+            );
 
-            $orderId = $pdo->lastInsertId();
+            $stockStatement = $pdo->prepare(
+                'UPDATE products
+                 SET stock = stock - :quantity_delta
+                 WHERE id = :product_id
+                   AND status = 1
+                   AND stock >= :quantity_check'
+            );
 
+            foreach ($lockedCart['items'] as $item) {
+                $quantity = (int)$item['quantity'];
+                $productId = (int)$item['id'];
 
-            /* =========================
-               LƯU ORDER ITEMS
-            ========================= */
-
-            $itemSql = "INSERT INTO order_items
-                        (
-                            order_id,
-                            product_id,
-                            quantity,
-                            price
-                        )
-                        VALUES
-                        (
-                            :order_id,
-                            :product_id,
-                            :quantity,
-                            :price
-                        )";
-
-            $itemStmt = $pdo->prepare($itemSql);
-
-
-            foreach ($products as $product) {
-
-                $productId =
-                    (int)$product['id'];
-
-                $quantity =
-                    (int)(
-                        $cart[$productId]
-                        ?? 0
-                    );
-
-                if ($quantity <= 0) {
-                    continue;
-                }
-
-                $price =
-                    (float)(
-                        $product['price']
-                        ?? 0
-                    );
-
-
-                $itemStmt->execute([
-
-                    ':order_id' =>
-                        $orderId,
-
-                    ':product_id' =>
-                        $productId,
-
-                    ':quantity' =>
-                        $quantity,
-
-                    ':price' =>
-                        $price
-
+                $itemStatement->execute([
+                    ':order_id' => $orderId,
+                    ':product_id' => $productId,
+                    ':product_name' => (string)$item['name'],
+                    ':product_image' => (string)($item['image'] ?? ''),
+                    ':selected_size' => ($item['selected_size'] ?? '') !== '' ? (string)$item['selected_size'] : null,
+                    ':selected_color' => ($item['selected_color'] ?? '') !== '' ? (string)$item['selected_color'] : null,
+                    ':material' => ($item['material'] ?? '') !== '' ? (string)$item['material'] : null,
+                    ':quantity' => $quantity,
+                    ':price' => number_format((float)$item['price'], 2, '.', ''),
                 ]);
 
+                $stockStatement->execute([
+                    ':quantity_delta' => $quantity,
+                    ':quantity_check' => $quantity,
+                    ':product_id' => $productId,
+                ]);
+
+                if ($stockStatement->rowCount() !== 1) {
+                    throw new DomainException('Tá»“n kho vá»«a thay Ä‘á»•i. Vui lÃ²ng kiá»ƒm tra láº¡i giá» hÃ ng.');
+                }
             }
 
-
-            /* =========================
-               XÓA GIỎ HÀNG
-            ========================= */
-
+            $pdo->commit();
             $_SESSION['cart'] = [];
 
-            $success = true;
+            $recentOrderIds = $_SESSION['recent_order_ids'] ?? [];
+            $recentOrderIds = is_array($recentOrderIds) ? $recentOrderIds : [];
+            $recentOrderIds[] = $orderId;
+            $_SESSION['recent_order_ids'] = array_slice(
+                array_values(array_unique(array_map('intval', $recentOrderIds))),
+                -20
+            );
 
-
-        } catch (PDOException $e) {
-
-            $error =
-                "Không thể đặt hàng: "
-                . $e->getMessage();
-
-        }
-
-    }
-
-}
-
-?>
-
-
-<!DOCTYPE html>
-
-<html lang="vi">
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>
-        Thanh toán - Fashion Shop
-    </title>
-
-    <link
-        rel="stylesheet"
-        href="../assets/css/style.css"
-    >
-
-    <style>
-
-        .checkout-page {
-            padding: 70px 0 90px;
-            background: #f8fbf7;
-            min-height: 650px;
-        }
-
-        .checkout-title {
-            text-align: center;
-            margin-bottom: 45px;
-        }
-
-        .checkout-title h1 {
-            font-size: 42px;
-            color: #263126;
-            margin-bottom: 12px;
-        }
-
-        .checkout-title p {
-            color: #697369;
-        }
-
-        .checkout-layout {
-            display: grid;
-            grid-template-columns: 1.4fr 0.8fr;
-            gap: 30px;
-        }
-
-        .checkout-box {
-            background: #ffffff;
-            border: 1px solid #e3e9e3;
-            padding: 30px;
-        }
-
-        .checkout-box h2 {
-            color: #263126;
-            font-size: 23px;
-            margin-bottom: 25px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #263126;
-            font-size: 14px;
-            font-weight: 700;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 13px 14px;
-            border: 1px solid #d9e0da;
-            background: #ffffff;
-            color: #263126;
-            font-family: inherit;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .form-group textarea {
-            min-height: 110px;
-            resize: vertical;
-        }
-
-        .checkout-submit {
-            width: 100%;
-            margin-top: 15px;
-            min-height: 50px;
-            border: none;
-            background: #263126;
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-
-        .checkout-submit:hover {
-            background: #78917d;
-        }
-
-        .checkout-back {
-            display: inline-block;
-            margin-top: 15px;
-            color: #78917d;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .checkout-error {
-            margin-bottom: 25px;
-            padding: 14px 16px;
-            background: #fff1f1;
-            border: 1px solid #e8caca;
-            color: #9a4545;
-        }
-
-        .checkout-success {
-            background: #ffffff;
-            border: 1px solid #dce7dd;
-            padding: 60px 30px;
-            text-align: center;
-        }
-
-        .checkout-success h2 {
-            color: #263126;
-            font-size: 30px;
-            margin-bottom: 15px;
-        }
-
-        .checkout-success p {
-            color: #697369;
-            margin-bottom: 25px;
-        }
-
-        .success-btn {
-            display: inline-flex;
-            padding: 13px 25px;
-            background: #263126;
-            color: #ffffff;
-            font-weight: 700;
-        }
-
-        .order-item {
-            display: flex;
-            justify-content: space-between;
-            gap: 15px;
-            padding: 15px 0;
-            border-bottom: 1px solid #e5eae5;
-        }
-
-        .order-item-name {
-            color: #263126;
-            font-weight: 600;
-        }
-
-        .order-item-quantity {
-            color: #7a837b;
-            font-size: 13px;
-            margin-top: 5px;
-        }
-
-        .order-item-price {
-            color: #263126;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .order-total {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 25px;
-            padding-top: 20px;
-            border-top: 2px solid #263126;
-        }
-
-        .order-total strong {
-            font-size: 20px;
-            color: #263126;
-        }
-
-        .order-total span {
-            font-size: 22px;
-            font-weight: 700;
-            color: #78917d;
-        }
-
-        @media (max-width: 800px) {
-
-            .checkout-layout {
-                grid-template-columns: 1fr;
+            safe_redirect(
+                'history.php?success=1&order_id=' . $orderId,
+                'history.php',
+                303
+            );
+        } catch (DomainException $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $error = $exception->getMessage();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
 
+            error_log('[checkout] Order failed: ' . $exception->getMessage());
+            $error = 'Äáº·t hÃ ng tháº¥t báº¡i. Vui lÃ²ng thá»­ láº¡i sau.';
         }
 
+        if ($error !== '') {
+            try {
+                $cartData = load_cart($pdo);
+            } catch (PDOException $exception) {
+                error_log('[checkout] Cannot reload cart: ' . $exception->getMessage());
+            }
+        }
+    }
+}
+
+$items = $cartData['items'];
+$total = (float)$cartData['total'];
+$cartCount = cart_quantity_count($cartData['cart']);
+
+if ($error === '' && !$cartData['canCheckout']) {
+    $error = 'Giá» hÃ ng cÃ³ sáº£n pháº©m, phÃ¢n loáº¡i hoáº·c tá»“n kho khÃ´ng há»£p lá»‡. Vui lÃ²ng quay láº¡i giá» hÃ ng.';
+}
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="HoÃ n táº¥t thÃ´ng tin giao hÃ ng vÃ  Ä‘áº·t hÃ ng táº¡i Fashion Shop.">
+    <title>Thanh toÃ¡n | Fashion Shop</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <style>
+        .checkout-variant { display:block; margin-top:4px; color:#637067; font-size:12px; }
     </style>
-
 </head>
-
-
-<body>
-
-
-<header class="header">
-
-    <div class="container header-content">
-
-        <a
-            href="../index.php"
-            class="logo"
-        >
-            Fashion<span>Shop</span>
-        </a>
-
-
-        <nav class="nav">
-
-            <a href="../index.php">
-                Trang chủ
-            </a>
-
-            <a href="../products/index.php">
-                Sản phẩm
-            </a>
-
-            <a href="../products/index.php?category=1">
-                Áo
-            </a>
-
-            <a href="../products/index.php?category=2">
-                Quần
-            </a>
-
-            <a href="../products/index.php?category=3">
-                Váy
-            </a>
-
-        </nav>
-
-
-        <a
-            href="index.php"
-            class="cart"
-        >
-            Giỏ hàng
-            <span>
-                <?= count($_SESSION['cart'] ?? []) ?>
-            </span>
-        </a>
-
-    </div>
-
-</header>
-
-
-<section class="checkout-page">
-
-    <div class="container">
-
-
-        <div class="checkout-title">
-
-            <div class="small-title">
-                CHECKOUT
+<body class="site-body checkout-page">
+<?php
+$siteBasePath = '../';
+$currentPage = 'cart';
+$currentCategory = 0;
+require __DIR__ . '/../includes/header.php';
+?>
+<main id="main-content">
+    <section class="page-intro page-intro--compact checkout-intro">
+        <div class="site-container">
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+                <a href="../index.php">Trang chá»§</a><span>/</span>
+                <a href="index.php">Giá» hÃ ng</a><span>/</span>
+                <span>Thanh toÃ¡n</span>
+            </nav>
+            <div class="page-intro__content">
+                <p class="eyebrow">Secure checkout</p>
+                <h1>Thanh toÃ¡n</h1>
+                <p>GiÃ¡, phÃ¢n loáº¡i vÃ  tá»“n kho Ä‘Æ°á»£c kiá»ƒm tra láº¡i khi xÃ¡c nháº­n Ä‘Æ¡n hÃ ng.</p>
             </div>
-
-            <h1>
-                Thanh toán
-            </h1>
-
-            <p>
-                Nhập thông tin nhận hàng để hoàn tất đơn hàng.
-            </p>
-
         </div>
+    </section>
 
-
-        <?php if ($success): ?>
-
-
-            <div class="checkout-success">
-
-                <h2>
-                    Đặt hàng thành công!
-                </h2>
-
-                <p>
-                    Đơn hàng của bạn đã được ghi nhận.
-                </p>
-
-                <a
-                    href="history.php"
-                    class="success-btn"
-                >
-                    Xem lịch sử đơn hàng
-                </a>
-
-            </div>
-
-
-        <?php else: ?>
-
-
-            <?php if ($error !== ""): ?>
-
-                <div class="checkout-error">
-
-                    <?= htmlspecialchars($error) ?>
-
+    <section class="checkout-section">
+        <div class="site-container checkout-layout">
+            <div class="checkout-form-panel">
+                <div class="checkout-panel__heading">
+                    <span>01</span>
+                    <div><p class="eyebrow">Delivery details</p><h2>ThÃ´ng tin giao hÃ ng</h2></div>
                 </div>
 
-            <?php endif; ?>
-
-
-            <div class="checkout-layout">
-
-
-                <!-- THÔNG TIN NHẬN HÀNG -->
-
-                <div class="checkout-box">
-
-                    <h2>
-                        Thông tin nhận hàng
-                    </h2>
-
-
-                    <form
-                        method="POST"
-                        action=""
-                    >
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Họ và tên
-                            </label>
-
-                            <input
-                                type="text"
-                                name="name"
-                                placeholder="Nhập họ và tên"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Số điện thoại
-                            </label>
-
-                            <input
-                                type="text"
-                                name="phone"
-                                placeholder="Nhập số điện thoại"
-                                required
-                            >
-
-                        </div>
-
-
-                        <div class="form-group">
-
-                            <label>
-                                Địa chỉ nhận hàng
-                            </label>
-
-                            <textarea
-                                name="address"
-                                placeholder="Nhập địa chỉ nhận hàng"
-                                required
-                            ></textarea>
-
-                        </div>
-
-
-                        <button
-                            type="submit"
-                            class="checkout-submit"
-                        >
-                            Xác nhận đặt hàng
-                        </button>
-
-
-                    </form>
-
-
-                    <a
-                        href="index.php"
-                        class="checkout-back"
-                    >
-                        ← Quay lại giỏ hàng
-                    </a>
-
-                </div>
-
-
-                <!-- ĐƠN HÀNG -->
-
-                <div class="checkout-box">
-
-                    <h2>
-                        Đơn hàng của bạn
-                    </h2>
-
-
-                    <?php foreach ($products as $product): ?>
-
-                        <?php
-
-                        $productId =
-                            (int)$product['id'];
-
-                        $quantity =
-                            (int)(
-                                $cart[$productId]
-                                ?? 0
-                            );
-
-                        if ($quantity <= 0) {
-                            continue;
-                        }
-
-                        $price =
-                            (float)(
-                                $product['price']
-                                ?? 0
-                            );
-
-                        $subtotal =
-                            $price * $quantity;
-
-                        ?>
-
-
-                        <div class="order-item">
-
-                            <div>
-
-                                <div class="order-item-name">
-
-                                    <?= htmlspecialchars(
-                                        $product['name']
-                                    ) ?>
-
-                                </div>
-
-                                <div class="order-item-quantity">
-
-                                    Số lượng:
-                                    <?= $quantity ?>
-
-                                </div>
-
-                            </div>
-
-
-                            <div class="order-item-price">
-
-                                <?= number_format(
-                                    $subtotal,
-                                    0,
-                                    ',',
-                                    '.'
-                                ) ?>đ
-
-                            </div>
-
-                        </div>
-
-
-                    <?php endforeach; ?>
-
-
-                    <div class="order-total">
-
-                        <strong>
-                            Tổng cộng
-                        </strong>
-
-                        <span>
-
-                            <?= number_format(
-                                $total,
-                                0,
-                                ',',
-                                '.'
-                            ) ?>đ
-
-                        </span>
-
+                <?php if ($error !== ''): ?>
+                    <div class="form-alert" role="alert"><?= e($error) ?></div>
+                <?php endif; ?>
+
+                <form method="post" class="checkout-form" action="checkout.php">
+                    <?= csrf_field() ?>
+
+                    <div class="form-field">
+                        <label for="receiver_name">Há» vÃ  tÃªn *</label>
+                        <input type="text" id="receiver_name" name="receiver_name" value="<?= e($receiverName) ?>" maxlength="100" required>
                     </div>
 
-                </div>
+                    <div class="form-field">
+                        <label for="phone">Sá»‘ Ä‘iá»‡n thoáº¡i *</label>
+                        <input type="tel" id="phone" name="phone" value="<?= e($phone) ?>" maxlength="20" required>
+                    </div>
 
+                    <div class="form-field">
+                        <label for="address">Äá»‹a chá»‰ nháº­n hÃ ng *</label>
+                        <textarea id="address" name="address" maxlength="255" required><?= e($address) ?></textarea>
+                    </div>
 
+                    <button type="submit"
+                            class="button button--primary checkout-submit"
+                            <?= !$cartData['canCheckout'] ? 'disabled' : '' ?>>
+                        XÃ¡c nháº­n Ä‘áº·t hÃ ng
+                    </button>
+                </form>
+
+                <a class="checkout-back" href="index.php">â† Quay láº¡i giá» hÃ ng</a>
             </div>
 
+            <aside class="checkout-summary">
+                <div class="checkout-panel__heading">
+                    <span>02</span>
+                    <div><p class="eyebrow">Order summary</p><h2>ÄÆ¡n hÃ ng cá»§a báº¡n</h2></div>
+                </div>
 
-        <?php endif; ?>
+                <div class="checkout-summary__items">
+                    <?php foreach ($items as $item): ?>
+                        <div class="checkout-item">
+                            <div>
+                                <h3><?= e($item['name']) ?></h3>
+                                <span>Sá»‘ lÆ°á»£ng: <?= (int)$item['quantity'] ?></span>
 
+                                <?php if (($item['selected_size'] ?? '') !== '' || ($item['selected_color'] ?? '') !== ''): ?>
+                                    <span class="checkout-variant">
+                                        <?php if (($item['selected_size'] ?? '') !== ''): ?>
+                                            KÃ­ch cá»¡: <?= e($item['selected_size']) ?>
+                                        <?php endif; ?>
 
-    </div>
+                                        <?php if (($item['selected_size'] ?? '') !== '' && ($item['selected_color'] ?? '') !== ''): ?>
+                                            Â·
+                                        <?php endif; ?>
 
-</section>
+                                        <?php if (($item['selected_color'] ?? '') !== ''): ?>
+                                            MÃ u: <?= e($item['selected_color']) ?>
+                                        <?php endif; ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <strong><?= number_format((float)$item['subtotal'], 0, ',', '.') ?>Ä‘</strong>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
 
+                <div class="checkout-summary__meta">
+                    <div><span>Táº¡m tÃ­nh</span><strong><?= number_format($total, 0, ',', '.') ?>Ä‘</strong></div>
+                    <div><span>PhÃ­ váº­n chuyá»ƒn</span><strong>TÃ­nh theo chÃ­nh sÃ¡ch</strong></div>
+                </div>
 
+                <div class="checkout-summary__total">
+                    <span>Tá»•ng cá»™ng</span>
+                    <strong><?= number_format($total, 0, ',', '.') ?>Ä‘</strong>
+                </div>
+            </aside>
+        </div>
+    </section>
+</main>
+<?php require __DIR__ . '/../includes/footer.php'; ?>
+<script src="../assets/js/main.js" defer></script>
 </body>
-
 </html>

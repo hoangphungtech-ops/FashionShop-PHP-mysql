@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/includes/db.php";
+require_once __DIR__ . "/includes/auth.php";
 
 /* =========================
    GET PRODUCTS
@@ -100,12 +101,12 @@ function getProductImage($image)
     <title>Fashion Shop</title>
 
     <link rel="stylesheet"
-          href="assets/css/style.css">
+          href="assets/css/style.css?v=20260831-7">
 
 </head>
 
 
-<body>
+<body class="home-page">
 
 
 <!-- =========================
@@ -150,14 +151,23 @@ function getProductImage($image)
         </nav>
 
 
-        <a href="cart/index.php"
-           class="cart">
+        <div style="display: flex; gap: 10px;">
 
-            Giỏ hàng
+            <a href="<?= is_logged_in() ? 'auth/profile.php' : 'auth/login.php' ?>">
+                <?= is_logged_in() ? 'Tài khoản' : 'Đăng nhập/Đăng ký' ?>
+            </a>
 
-            <span>0</span>
 
-        </a>
+            <a href="cart/index.php"
+               class="cart">
+
+                Giỏ hàng
+
+                <span>0</span>
+
+            </a>
+
+        </div>
 
     </div>
 
@@ -211,19 +221,61 @@ function getProductImage($image)
 
             </a>
 
+
+            <div class="hero-meta"
+                 aria-label="Thông tin bộ sưu tập">
+
+                <span>✦ NEW COLLECTION</span>
+
+                <span>MEN &amp; WOMEN</span>
+
+                <span>MODERN / ELEGANT</span>
+
+            </div>
+
         </div>
 
 
 
-        <div class="hero-image">
+        <div class="hero-duo">
 
-            <img
-                src="assets/images/ao-so-mi-nu - Copy.jpg"
-                alt="Fashion Shop"
-            >
+            <div class="hero-duo-card hero-duo-card--male">
+
+                <img
+                    src="assets/images/namthanhlich.png"
+                    alt="Thời trang nam thanh lịch"
+                >
+
+                <span class="hero-duo-label">
+                    MEN / TAILORED
+                </span>
+
+            </div>
+
+
+            <div class="hero-duo-card hero-duo-card--female">
+
+                <img
+                    src="assets/images/hero-fashion-nu-new.png"
+                    alt="Thời trang nữ hiện đại"
+                >
+
+                <span class="hero-duo-label">
+                    WOMEN / NEW EDIT
+                </span>
+
+            </div>
+
+
+            <div class="hero-duo-badge">
+
+                <strong>FS</strong>
+
+                <span>EDIT · 2026</span>
+
+            </div>
 
         </div>
-
 
     </div>
 
@@ -485,101 +537,7 @@ function getProductImage($image)
      FOOTER
 ========================= -->
 
-<footer class="footer">
-
-    <div class="container">
-
-
-        <div class="footer-content">
-
-
-            <div>
-
-                <h3>
-                    Fashion<span>Shop</span>
-                </h3>
-
-
-                <p>
-
-                    Thời trang trẻ trung,
-                    hiện đại và phù hợp
-                    với phong cách riêng
-                    của bạn.
-
-                </p>
-
-            </div>
-
-
-
-            <div>
-
-                <h4>
-                    Danh mục
-                </h4>
-
-
-                <a href="products/index.php">
-                    Tất cả sản phẩm
-                </a>
-
-
-                <a href="products/index.php?category=1">
-                    Áo
-                </a>
-
-
-                <a href="products/index.php?category=2">
-                    Quần
-                </a>
-
-
-                <a href="products/index.php?category=3">
-                    Váy
-                </a>
-
-            </div>
-
-
-
-            <div>
-
-                <h4>
-                    Hỗ trợ
-                </h4>
-
-
-                <a href="#">
-                    Chính sách đổi trả
-                </a>
-
-
-                <a href="#">
-                    Vận chuyển
-                </a>
-
-
-                <a href="#">
-                    Liên hệ
-                </a>
-
-            </div>
-
-
-        </div>
-
-
-        <div class="copyright">
-
-            © 2026 Fashion Shop
-
-        </div>
-
-
-    </div>
-
-</footer>
+<?php require __DIR__ . '/includes/footer.php'; ?>
 
 
 </body>

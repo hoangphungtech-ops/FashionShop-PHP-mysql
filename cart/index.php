@@ -1,755 +1,307 @@
 <?php
 
-require_once __DIR__ . "/../includes/db.php";
+declare(strict_types=1);
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/cart.php';
 
-/*
-|--------------------------------------------------------------------------
-| LẤY GIỎ HÀNG
-|--------------------------------------------------------------------------
-| Giả sử giỏ hàng được lưu trong session:
-| $_SESSION['cart'][product_id] = số lượng
-*/
-
-$cart = $_SESSION['cart'] ?? [];
-
-$products = [];
-$total = 0;
-
-if (!empty($cart)) {
-
-    $ids = array_keys($cart);
-
-    $ids = array_map('intval', $ids);
-
-    $ids = array_filter($ids, function ($id) {
-        return $id > 0;
-    });
-
-    if (!empty($ids)) {
-
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-
-        try {
-
-            $sql = "SELECT *
-                    FROM products
-                    WHERE id IN ($placeholders)
-                    AND status = 1";
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($ids);
-
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        } catch (PDOException $e) {
-
-            die("Lỗi database: " . $e->getMessage());
-
-        }
+if (is_post_request()) {
+    if (!csrf_validate(is_string($_POST['_csrf_token'] ?? null) ? $_POST['_csrf_token'] : null)) {
+        cart_flash('error', 'PhiÃªn thao tÃ¡c Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng thá»­ láº¡i.');
+        safe_redirect('index.php', 'index.php', 303);
     }
+
+    $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+    $lineKey = is_string($_POST['line_key'] ?? null) ? trim($_POST['line_key']) : '';
+    $cart = cart_quantities();
+
+    if ($lineKey === '' || !isset($cart[$lineKey])) {
+        cart_flash('error', 'Sáº£n pháº©m khÃ´ng cÃ³ trong giá» hÃ ng.');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    $line = $cart[$lineKey];
+    $productId = (int)$line['product_id'];
+
+    if ($action === 'remove') {
+        unset($cart[$lineKey]);
+        $_SESSION['cart'] = $cart;
+        cart_flash('success', 'ÄÃ£ xÃ³a sáº£n pháº©m khá»i giá» hÃ ng.');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    $quantity = (int)$line['quantity'];
+
+    if ($action === 'increase') {
+        $quantity++;
+    } elseif ($action === 'decrease') {
+        $quantity--;
+    } elseif ($action === 'update') {
+        $quantityInput = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 0, 'max_range' => 9999],
+        ]);
+
+        if ($quantityInput === false) {
+            cart_flash('error', 'Sá»‘ lÆ°á»£ng pháº£i lÃ  sá»‘ nguyÃªn khÃ´ng Ã¢m.');
+            safe_redirect('index.php', 'index.php', 303);
+        }
+
+        $quantity = (int)$quantityInput;
+    } else {
+        cart_flash('error', 'Thao tÃ¡c giá» hÃ ng khÃ´ng há»£p lá»‡.');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    if ($quantity <= 0) {
+        unset($cart[$lineKey]);
+        $_SESSION['cart'] = $cart;
+        cart_flash('success', 'ÄÃ£ xÃ³a sáº£n pháº©m khá»i giá» hÃ ng.');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    try {
+        $stockStatement = $pdo->prepare(
+            'SELECT stock, status FROM products WHERE id = :id LIMIT 1'
+        );
+        $stockStatement->execute([':id' => $productId]);
+        $product = $stockStatement->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $exception) {
+        error_log('[cart-update] Cannot load product: ' . $exception->getMessage());
+        cart_flash('error', 'ChÆ°a thá»ƒ cáº­p nháº­t giá» hÃ ng lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i.');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    if ($product === null || (int)$product['status'] !== 1) {
+        cart_flash('error', 'Sáº£n pháº©m khÃ´ng cÃ²n Ä‘Æ°á»£c bÃ¡n.');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    $stock = max(0, (int)$product['stock']);
+    $aggregate = 0;
+
+    foreach ($cart as $key => $cartLine) {
+        if ((int)$cartLine['product_id'] !== $productId) {
+            continue;
+        }
+
+        $aggregate += $key === $lineKey
+            ? $quantity
+            : (int)$cartLine['quantity'];
+    }
+
+    if ($aggregate > $stock) {
+        cart_flash('error', 'Tá»•ng sá»‘ lÆ°á»£ng cÃ¡c phÃ¢n loáº¡i vÆ°á»£t tá»“n kho hiá»‡n cÃ³ (' . $stock . ').');
+        safe_redirect('index.php', 'index.php', 303);
+    }
+
+    $cart[$lineKey]['quantity'] = $quantity;
+    $_SESSION['cart'] = $cart;
+
+    cart_flash('success', 'ÄÃ£ cáº­p nháº­t sá»‘ lÆ°á»£ng sáº£n pháº©m.');
+    safe_redirect('index.php', 'index.php', 303);
 }
 
+try {
+    $cartData = load_cart($pdo);
+    $loadError = '';
+} catch (PDOException $exception) {
+    error_log('[cart] Cannot load cart: ' . $exception->getMessage());
+    $cartData = [
+        'cart' => cart_quantities(),
+        'items' => [],
+        'missingLines' => [],
+        'missingIds' => [],
+        'total' => 0.0,
+        'canCheckout' => false,
+    ];
+    $loadError = 'ChÆ°a thá»ƒ táº£i giá» hÃ ng lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i sau.';
+}
+
+$cart = $cartData['cart'];
+$products = $cartData['items'];
+$total = (float)$cartData['total'];
+$cartFlash = pull_cart_flash();
+$hasMissingProducts = $cartData['missingLines'] !== [];
+$cartCount = cart_quantity_count($cart);
 ?>
-
 <!DOCTYPE html>
-
 <html lang="vi">
-
 <head>
-
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <title>Giỏ hàng - Fashion Shop</title>
-
-    <link
-        rel="stylesheet"
-        href="../assets/css/style.css"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kiá»ƒm tra giá» hÃ ng cá»§a báº¡n táº¡i Fashion Shop.">
+    <title>Giá» hÃ ng | Fashion Shop</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
     <style>
-
-        .cart-page {
-            padding: 70px 0 90px;
-            background: #f8fbf7;
-            min-height: 600px;
-        }
-
-        .cart-title {
-            text-align: center;
-            margin-bottom: 45px;
-        }
-
-        .cart-title .small-title {
-            margin-bottom: 10px;
-        }
-
-        .cart-title h1 {
-            font-size: 42px;
-            color: #263126;
-            margin-bottom: 12px;
-        }
-
-        .cart-title p {
-            color: #697369;
-            font-size: 15px;
-        }
-
-        .cart-box {
-            background: #ffffff;
-            border: 1px solid #e3e9e3;
-            padding: 30px;
-        }
-
-        .cart-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .cart-table th {
-            padding: 15px;
-            background: #263126;
-            color: #ffffff;
-            text-align: left;
-            font-size: 13px;
-        }
-
-        .cart-table td {
-            padding: 18px 15px;
-            border-bottom: 1px solid #e6ebe6;
-            color: #394239;
-            vertical-align: middle;
-        }
-
-        .cart-product {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .cart-product img {
-            width: 80px;
-            height: 90px;
-            object-fit: cover;
-            background: #f2f4f2;
-        }
-
-        .cart-product-name {
-            font-weight: 700;
-            color: #263126;
-        }
-
-        .cart-price {
-            font-weight: 600;
-        }
-
-        .cart-quantity {
-            font-weight: 700;
-        }
-
-        .cart-total {
-            font-weight: 700;
-            color: #263126;
-        }
-
-        .cart-summary {
-            margin-top: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .cart-grand-total {
-            font-size: 22px;
-            font-weight: 700;
-            color: #263126;
-        }
-
-        .cart-grand-total span {
-            color: #78917d;
-        }
-
-        .cart-actions {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .cart-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 48px;
-            padding: 0 24px;
-            font-size: 14px;
-            font-weight: 700;
-            transition: 0.3s ease;
-        }
-
-        .continue-btn {
-            border: 1px solid #78917d;
-            color: #78917d;
-            background: #ffffff;
-        }
-
-        .continue-btn:hover {
-            background: #edf4ee;
-        }
-
-        .checkout-btn {
-            border: 1px solid #263126;
-            background: #263126;
-            color: #ffffff;
-        }
-
-        .checkout-btn:hover {
-            background: #78917d;
-            border-color: #78917d;
-        }
-
-        .cart-empty {
-            text-align: center;
-            padding: 80px 20px;
-        }
-
-        .cart-empty h2 {
-            color: #263126;
-            margin-bottom: 12px;
-        }
-
-        .cart-empty p {
-            color: #707970;
-            margin-bottom: 25px;
-        }
-
-        .empty-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 13px 25px;
-            background: #263126;
-            color: #ffffff;
-            font-weight: 700;
-        }
-
-        .cart-footer {
-            background: #263126;
-            color: #ffffff;
-            padding: 50px 0 25px;
-        }
-
-        .cart-footer-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 50px;
-            padding-bottom: 35px;
-        }
-
-        .cart-footer h3 {
-            font-size: 25px;
-            margin-bottom: 12px;
-        }
-
-        .cart-footer h3 span {
-            color: #9ab19f;
-        }
-
-        .cart-footer h4 {
-            margin-bottom: 15px;
-        }
-
-        .cart-footer p,
-        .cart-footer a {
-            color: #bdc6bd;
-            font-size: 14px;
-        }
-
-        .cart-footer a {
-            display: block;
-            margin-bottom: 9px;
-        }
-
-        .cart-footer a:hover {
-            color: #ffffff;
-        }
-
-        .cart-copyright {
-            border-top: 1px solid #465046;
-            padding-top: 20px;
-            text-align: center;
-            color: #9fa99f;
-            font-size: 12px;
-        }
-
-        @media (max-width: 800px) {
-
-            .cart-box {
-                padding: 15px;
-                overflow-x: auto;
-            }
-
-            .cart-table {
-                min-width: 700px;
-            }
-
-            .cart-footer-content {
-                grid-template-columns: 1fr 1fr;
-            }
-
-        }
-
-        @media (max-width: 600px) {
-
-            .cart-page {
-                padding: 45px 0 60px;
-            }
-
-            .cart-title h1 {
-                font-size: 34px;
-            }
-
-            .cart-footer-content {
-                grid-template-columns: 1fr;
-            }
-
-        }
-
+        .cart-notice { margin: 0 0 20px; padding: 13px 16px; border-left: 3px solid #8e3f36; background: #fff3f1; color: #71342e; }
+        .cart-notice--success { border-color: #3e765c; background: #edf6f0; color: #28553f; }
+        .cart-quantity-form { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .cart-quantity-form button { min-width: 34px; min-height: 34px; border: 1px solid #ccd6ce; background: #fff; cursor: pointer; }
+        .cart-quantity-form input { width: 64px; min-height: 34px; padding: 5px; border: 1px solid #ccd6ce; text-align: center; }
+        .cart-quantity-form .cart-remove { border-color: transparent; color: #93483f; text-decoration: underline; }
+        .cart-stock { display: block; margin-top: 6px; color: #687168; font-size: 12px; }
+        .cart-stock--error { color: #93483f; font-weight: 700; }
+        .cart-variant { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+        .cart-variant span { padding: 3px 7px; border: 1px solid #dce2da; font-size: 12px; color: #4f5e54; }
+        .cart-missing-form { display: inline; margin-left: 8px; }
+        .cart-missing-form button { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+        .order-summary__checkout[aria-disabled="true"] { pointer-events: none; opacity: .5; }
+        @media (max-width: 700px) { .cart-quantity-form { justify-content: flex-end; } }
     </style>
-
 </head>
-
-
-<body>
-
-
-<!-- HEADER -->
-
-<header class="header">
-
-    <div class="container header-content">
-
-        <a
-            href="../index.php"
-            class="logo"
-        >
-            Fashion<span>Shop</span>
-        </a>
-
-
-        <nav class="nav">
-
-            <a href="../index.php">
-                Trang chủ
-            </a>
-
-            <a href="../products/index.php">
-                Sản phẩm
-            </a>
-
-            <a href="../products/index.php?category=1">
-                Áo
-            </a>
-
-            <a href="../products/index.php?category=2">
-                Quần
-            </a>
-
-            <a href="../products/index.php?category=3">
-                Váy
-            </a>
-
-        </nav>
-
-
-        <a
-            href="index.php"
-            class="cart"
-        >
-            Giỏ hàng
-            <span><?= count($cart) ?></span>
-        </a>
-
-    </div>
-
-</header>
-
-
-<!-- CART -->
-
-<section class="cart-page">
-
-    <div class="container">
-
-
-        <div class="cart-title">
-
-            <div class="small-title">
-                YOUR SHOPPING BAG
+<body class="site-body cart-page">
+<?php
+$siteBasePath = '../';
+$currentPage = 'cart';
+$currentCategory = 0;
+require __DIR__ . '/../includes/header.php';
+?>
+<main id="main-content">
+    <section class="page-intro page-intro--compact">
+        <div class="site-container">
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+                <a href="../index.php">Trang chá»§</a><span aria-hidden="true">/</span>
+                <span aria-current="page">Giá» hÃ ng</span>
+            </nav>
+            <div class="page-intro__content">
+                <p class="eyebrow">Your shopping bag</p>
+                <h1>Giá» hÃ ng</h1>
+                <p>Kiá»ƒm tra lá»±a chá»n vÃ  tá»“n kho trÆ°á»›c khi thanh toÃ¡n.</p>
             </div>
-
-            <h1>
-                Giỏ hàng
-            </h1>
-
-            <p>
-                Kiểm tra sản phẩm trước khi thanh toán.
-            </p>
-
         </div>
+    </section>
 
-
-        <?php if (empty($products)): ?>
-
-
-            <div class="cart-box">
-
-                <div class="cart-empty">
-
-                    <h2>
-                        Giỏ hàng đang trống
-                    </h2>
-
-                    <p>
-                        Bạn chưa có sản phẩm nào trong giỏ hàng.
-                    </p>
-
-                    <a
-                        href="../products/index.php"
-                        class="empty-btn"
-                    >
-                        Xem sản phẩm
-                    </a>
-
+    <section class="cart-section">
+        <div class="site-container">
+            <?php if ($cartFlash !== null): ?>
+                <div class="cart-notice <?= ($cartFlash['type'] ?? '') === 'success' ? 'cart-notice--success' : '' ?>">
+                    <?= e($cartFlash['message'] ?? '') ?>
                 </div>
+            <?php endif; ?>
 
-            </div>
+            <?php if ($loadError !== ''): ?>
+                <div class="cart-notice"><?= e($loadError) ?></div>
+            <?php endif; ?>
 
+            <?php if ($hasMissingProducts): ?>
+                <div class="cart-notice">
+                    CÃ³ sáº£n pháº©m trong giá» khÃ´ng cÃ²n tá»“n táº¡i.
+                    <?php foreach ($cartData['missingLines'] as $missing): ?>
+                        <form class="cart-missing-form" method="post" action="index.php">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="line_key" value="<?= e($missing['line_key']) ?>">
+                            <button type="submit" name="action" value="remove">XÃ³a má»¥c #<?= (int)$missing['product_id'] ?></button>
+                        </form>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
 
-        <?php else: ?>
+            <?php if ($cart === []): ?>
+                <div class="empty-state empty-state--cart">
+                    <p class="eyebrow">Your bag is empty</p>
+                    <h2>Giá» hÃ ng Ä‘ang trá»‘ng</h2>
+                    <p>Báº¡n chÆ°a cÃ³ sáº£n pháº©m nÃ o trong giá» hÃ ng.</p>
+                    <a class="button button--primary" href="../products/index.php">KhÃ¡m phÃ¡ sáº£n pháº©m</a>
+                </div>
+            <?php else: ?>
+                <div class="cart-layout">
+                    <div class="cart-list">
+                        <div class="cart-list__heading">
+                            <h2>Sáº£n pháº©m Ä‘Ã£ chá»n</h2>
+                            <span><?= $cartCount ?> sáº£n pháº©m</span>
+                        </div>
 
+                        <table class="cart-table">
+                            <thead>
+                                <tr>
+                                    <th>Sáº£n pháº©m</th>
+                                    <th>ÄÆ¡n giÃ¡</th>
+                                    <th>Sá»‘ lÆ°á»£ng</th>
+                                    <th>ThÃ nh tiá»n</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($products as $product): ?>
+                                <?php
+                                $productId = (int)$product['id'];
+                                $quantity = (int)$product['quantity'];
+                                $stock = (int)$product['stock'];
+                                $isAvailable = (bool)$product['is_available'];
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="cart-product">
+                                            <a class="cart-product__image" href="../products/detail.php?id=<?= $productId ?>">
+                                                <img src="<?= e(cart_product_image_url($product['image'])) ?>" alt="<?= e($product['name']) ?>">
+                                            </a>
+                                            <div class="cart-product__info">
+                                                <span>Fashion selection</span>
+                                                <h3><a href="../products/detail.php?id=<?= $productId ?>"><?= e($product['name']) ?></a></h3>
 
-            <div class="cart-box">
+                                                <?php if (($product['selected_size'] ?? '') !== '' || ($product['selected_color'] ?? '') !== ''): ?>
+                                                    <div class="cart-variant">
+                                                        <?php if (($product['selected_size'] ?? '') !== ''): ?>
+                                                            <span>KÃ­ch cá»¡: <?= e($product['selected_size']) ?></span>
+                                                        <?php endif; ?>
+                                                        <?php if (($product['selected_color'] ?? '') !== ''): ?>
+                                                            <span>MÃ u: <?= e($product['selected_color']) ?></span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endif; ?>
 
-                <table class="cart-table">
-
-                    <thead>
-
-                        <tr>
-
-                            <th>
-                                Sản phẩm
-                            </th>
-
-                            <th>
-                                Đơn giá
-                            </th>
-
-                            <th>
-                                Số lượng
-                            </th>
-
-                            <th>
-                                Thành tiền
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-
-                    <tbody>
-
-
-                        <?php foreach ($products as $product): ?>
-
-
-                            <?php
-
-                            $productId = (int)$product['id'];
-
-                            $quantity = (int)(
-                                $cart[$productId]
-                                ?? 0
-                            );
-
-                            if ($quantity <= 0) {
-                                continue;
-                            }
-
-                            $price = (float)(
-                                $product['price']
-                                ?? 0
-                            );
-
-                            $subtotal =
-                                $price * $quantity;
-
-                            $total += $subtotal;
-
-
-                            $image = trim(
-                                $product['image']
-                                ?? ''
-                            );
-
-                            if ($image === '') {
-                                $image =
-                                    "../assets/images/ao-thun.jpg";
-                            } else {
-
-                                if (
-                                    strpos(
-                                        $image,
-                                        "uploads/"
-                                    ) === 0
-                                ) {
-
-                                    $image = "../" . $image;
-
-                                } elseif (
-                                    strpos(
-                                        $image,
-                                        "assets/"
-                                    ) === 0
-                                ) {
-
-                                    $image = "../" . $image;
-
-                                } else {
-
-                                    $image =
-                                        "../uploads/products/"
-                                        . basename($image);
-
-                                }
-                            }
-
-                            ?>
-
-
-                            <tr>
-
-
-                                <td>
-
-                                    <div class="cart-product">
-
-                                        <img
-                                            src="<?= htmlspecialchars($image) ?>"
-                                            alt="<?= htmlspecialchars($product['name']) ?>"
-                                        >
-
-                                        <div>
-
-                                            <div class="cart-product-name">
-
-                                                <?= htmlspecialchars(
-                                                    $product['name']
-                                                ) ?>
-
+                                                <span class="cart-stock <?= !$isAvailable ? 'cart-stock--error' : '' ?>">
+                                                    <?php if (!(bool)$product['is_active']): ?>Ngá»«ng bÃ¡n
+                                                    <?php elseif (!$product['variant_valid']): ?>PhÃ¢n loáº¡i khÃ´ng cÃ²n há»£p lá»‡
+                                                    <?php elseif ($stock < 1): ?>Háº¿t hÃ ng
+                                                    <?php elseif (!$isAvailable): ?>Sá»‘ lÆ°á»£ng vÆ°á»£t tá»“n kho
+                                                    <?php else: ?>CÃ²n <?= $stock ?> sáº£n pháº©m<?php endif; ?>
+                                                </span>
                                             </div>
-
                                         </div>
-
-                                    </div>
-
-                                </td>
-
-
-                                <td class="cart-price">
-
-                                    <?= number_format(
-                                        $price,
-                                        0,
-                                        ',',
-                                        '.'
-                                    ) ?>đ
-
-                                </td>
-
-
-                                <td class="cart-quantity">
-
-                                    <?= $quantity ?>
-
-                                </td>
-
-
-                                <td class="cart-total">
-
-                                    <?= number_format(
-                                        $subtotal,
-                                        0,
-                                        ',',
-                                        '.'
-                                    ) ?>đ
-
-                                </td>
-
-
-                            </tr>
-
-
-                        <?php endforeach; ?>
-
-
-                    </tbody>
-
-                </table>
-
-
-                <div class="cart-summary">
-
-
-                    <div class="cart-grand-total">
-
-                        Tổng tiền:
-
-                        <span>
-
-                            <?= number_format(
-                                $total,
-                                0,
-                                ',',
-                                '.'
-                            ) ?>đ
-
-                        </span>
-
+                                    </td>
+                                    <td><?= number_format((float)$product['price'], 0, ',', '.') ?>Ä‘</td>
+                                    <td>
+                                        <form class="cart-quantity-form" method="post" action="index.php">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="line_key" value="<?= e($product['line_key']) ?>">
+                                            <button type="submit" name="action" value="decrease">âˆ’</button>
+                                            <input type="number" name="quantity" value="<?= $quantity ?>" min="0" max="<?= max(0, $stock) ?>">
+                                            <button type="submit" name="action" value="increase">+</button>
+                                            <button type="submit" name="action" value="update">Cáº­p nháº­t</button>
+                                            <button class="cart-remove" type="submit" name="action" value="remove" formnovalidate>XÃ³a</button>
+                                        </form>
+                                    </td>
+                                    <td><?= number_format((float)$product['subtotal'], 0, ',', '.') ?>Ä‘</td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
 
-
-                    <div class="cart-actions">
-
-                        <a
-                            href="../products/index.php"
-                            class="cart-btn continue-btn"
-                        >
-                            Tiếp tục mua hàng
+                    <aside class="order-summary">
+                        <p class="eyebrow">Order summary</p>
+                        <h2>TÃ³m táº¯t Ä‘Æ¡n hÃ ng</h2>
+                        <div class="order-summary__rows">
+                            <div><span>Táº¡m tÃ­nh</span><strong><?= number_format($total, 0, ',', '.') ?>Ä‘</strong></div>
+                            <div><span>PhÃ­ váº­n chuyá»ƒn</span><strong>TÃ­nh khi thanh toÃ¡n</strong></div>
+                        </div>
+                        <div class="order-summary__total">
+                            <span>Tá»•ng cá»™ng</span>
+                            <strong><?= number_format($total, 0, ',', '.') ?>Ä‘</strong>
+                        </div>
+                        <a class="button button--primary order-summary__checkout"
+                           href="checkout.php"
+                           <?= !$cartData['canCheckout'] ? 'aria-disabled="true"' : '' ?>>
+                            Thanh toÃ¡n
                         </a>
-
-
-                        <a
-                            href="checkout.php"
-                            class="cart-btn checkout-btn"
-                        >
-                            Thanh toán
-                        </a>
-
-                    </div>
-
-
+                        <a class="order-summary__continue" href="../products/index.php">â† Tiáº¿p tá»¥c mua hÃ ng</a>
+                    </aside>
                 </div>
-
-
-            </div>
-
-
-        <?php endif; ?>
-
-
-    </div>
-
-</section>
-
-
-<!-- FOOTER -->
-
-<footer class="cart-footer">
-
-    <div class="container">
-
-
-        <div class="cart-footer-content">
-
-
-            <div>
-
-                <h3>
-                    Fashion<span>Shop</span>
-                </h3>
-
-                <p>
-                    Thời trang trẻ trung,
-                    hiện đại và phù hợp
-                    với phong cách riêng
-                    của bạn.
-                </p>
-
-            </div>
-
-
-            <div>
-
-                <h4>
-                    Danh mục
-                </h4>
-
-                <a href="../products/index.php">
-                    Tất cả sản phẩm
-                </a>
-
-                <a href="../products/index.php?category=1">
-                    Áo
-                </a>
-
-                <a href="../products/index.php?category=2">
-                    Quần
-                </a>
-
-                <a href="../products/index.php?category=3">
-                    Váy
-                </a>
-
-            </div>
-
-
-            <div>
-
-                <h4>
-                    Hỗ trợ
-                </h4>
-
-                <a href="#">
-                    Chính sách đổi trả
-                </a>
-
-                <a href="#">
-                    Vận chuyển
-                </a>
-
-                <a href="#">
-                    Liên hệ
-                </a>
-
-            </div>
-
-
+            <?php endif; ?>
         </div>
-
-
-        <div class="cart-copyright">
-
-            © 2026 Fashion Shop
-
-        </div>
-
-
-    </div>
-
-</footer>
-
-
+    </section>
+</main>
+<?php require __DIR__ . '/../includes/footer.php'; ?>
+<script src="../assets/js/main.js" defer></script>
 </body>
-
 </html>
