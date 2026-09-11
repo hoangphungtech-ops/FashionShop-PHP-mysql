@@ -42,3 +42,10 @@ database/ngan_git_exact_stage/
 database/backup_placeholder_ngan_*/
 database/backup*.json
 database/*-before-*
+
+/config/database.php
+/config/mail.local.php
+/DEPLOY_*/
+/PRODUCTION_*/
+/database/FINAL_VARIANT_BACKUP_*/
+/database/ROUTE_FIX_BACKUP_*/

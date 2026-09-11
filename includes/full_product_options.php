@@ -391,7 +391,7 @@ function fs_render_full_product_options(
         form.method = 'post';
 
         form.action =
-            '/cart/full/add.php';
+            '/cart/add.php';
 
         function hidden(
             name,

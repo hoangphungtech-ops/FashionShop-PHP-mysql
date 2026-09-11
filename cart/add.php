@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/cart.php';
 
 function redirectAfterCartAdd(string $type, string $message, string $returnUrl): never
 {
@@ -18,15 +19,8 @@ if (!is_post_request()) {
     http_response_code(405);
     header('Allow: POST');
     header('Content-Type: text/html; charset=UTF-8');
-
-    echo '<!doctype html><html lang="vi"><head><meta charset="utf-8">'
-        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        . '<title>Yêu cầu không hợp lệ</title></head><body>'
-        . '<main style="max-width:640px;margin:70px auto;padding:24px;font-family:Arial,sans-serif">'
-        . '<h1>Yêu cầu không hợp lệ</h1>'
-        . '<p>Vui lòng thêm sản phẩm từ trang chi tiết sản phẩm.</p>'
-        . '<a href="../products/index.php">Quay lại sản phẩm</a>'
-        . '</main></body></html>';
+    echo '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>YÃªu cáº§u khÃ´ng há»£p lá»‡</title></head><body>'
+        . '<p>Vui lÃ²ng thÃªm sáº£n pháº©m tá»« trang chi tiáº¿t sáº£n pháº©m.</p></body></html>';
     exit;
 }
 
@@ -34,108 +28,123 @@ $returnUrlInput = $_POST['return_url'] ?? '';
 $returnUrl = is_string($returnUrlInput) && is_safe_redirect_target($returnUrlInput)
     ? $returnUrlInput
     : '../products/index.php';
+
 $csrfToken = $_POST['_csrf_token'] ?? null;
 
 if (!is_string($csrfToken) || !csrf_validate($csrfToken)) {
-    redirectAfterCartAdd(
-        'error',
-        'Phiên thêm vào giỏ đã hết hạn. Vui lòng thử lại.',
-        $returnUrl
-    );
+    redirectAfterCartAdd('error', 'PhiÃªn thÃªm vÃ o giá» Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng thá»­ láº¡i.', $returnUrl);
 }
 
 $productId = input_int($_POST, 'product_id');
 $requestedQuantity = input_int($_POST, 'quantity', 1, 9999);
+$requestedSize = trim((string)($_POST['size'] ?? ''));
+$requestedColor = trim((string)($_POST['color'] ?? ''));
 
 if ($productId === null || $requestedQuantity === null) {
-    redirectAfterCartAdd(
-        'error',
-        'Sản phẩm hoặc số lượng không hợp lệ.',
-        $returnUrl
-    );
+    redirectAfterCartAdd('error', 'Sáº£n pháº©m hoáº·c sá»‘ lÆ°á»£ng khÃ´ng há»£p lá»‡.', $returnUrl);
 }
 
 try {
-    $productStatement = $pdo->prepare(
-        'SELECT id, name, stock
+    $statement = $pdo->prepare(
+        'SELECT id, name, stock, status, size, color, material
          FROM products
          WHERE id = :id
-           AND status = :active_status
+           AND status = 1
          LIMIT 1'
     );
-    $productStatement->execute([
-        ':id' => $productId,
-        ':active_status' => 1,
-    ]);
-    $product = $productStatement->fetch(PDO::FETCH_ASSOC) ?: null;
+    $statement->execute([':id' => $productId]);
+    $product = $statement->fetch(PDO::FETCH_ASSOC) ?: null;
 } catch (PDOException $exception) {
     error_log('[cart-add] Cannot load product: ' . $exception->getMessage());
-
-    redirectAfterCartAdd(
-        'error',
-        'Không thể thêm sản phẩm lúc này. Vui lòng thử lại sau.',
-        $returnUrl
-    );
+    redirectAfterCartAdd('error', 'KhÃ´ng thá»ƒ thÃªm sáº£n pháº©m lÃºc nÃ y. Vui lÃ²ng thá»­ láº¡i sau.', $returnUrl);
 }
 
 if ($product === null) {
-    redirectAfterCartAdd(
-        'error',
-        'Sản phẩm không tồn tại hoặc đã ngừng bán.',
-        $returnUrl
-    );
+    redirectAfterCartAdd('error', 'Sáº£n pháº©m khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ ngá»«ng bÃ¡n.', $returnUrl);
 }
 
-$stock = max(0, (int) ($product['stock'] ?? 0));
+$stock = max(0, (int)$product['stock']);
 
 if ($stock < 1) {
+    redirectAfterCartAdd('error', 'Sáº£n pháº©m Ä‘Ã£ háº¿t hÃ ng.', $returnUrl);
+}
+
+$allowedSizes = cart_option_list($product['size'] ?? '');
+$allowedColors = cart_option_list($product['color'] ?? '');
+
+$size = '';
+$color = '';
+
+if ($allowedSizes !== []) {
+    $size = cart_match_option($requestedSize, $allowedSizes) ?? '';
+
+    if ($size === '') {
+        redirectAfterCartAdd('error', 'Vui lÃ²ng chá»n kÃ­ch cá»¡ há»£p lá»‡.', $returnUrl);
+    }
+}
+
+if ($allowedColors !== []) {
+    if ($requestedColor === '' && count($allowedColors) === 1) {
+        $color = $allowedColors[0];
+    } else {
+        $color = cart_match_option($requestedColor, $allowedColors) ?? '';
+    }
+
+    if ($color === '') {
+        redirectAfterCartAdd('error', 'Vui lÃ²ng chá»n mÃ u sáº¯c há»£p lá»‡.', $returnUrl);
+    }
+}
+
+$cart = cart_quantities();
+$lineKey = cart_line_key($productId, $size, $color);
+$currentLineQuantity = isset($cart[$lineKey])
+    ? (int)$cart[$lineKey]['quantity']
+    : 0;
+
+$productQuantityInCart = 0;
+
+foreach ($cart as $line) {
+    if ((int)$line['product_id'] === $productId) {
+        $productQuantityInCart += (int)$line['quantity'];
+    }
+}
+
+if (($productQuantityInCart + $requestedQuantity) > $stock) {
     redirectAfterCartAdd(
         'error',
-        'Sản phẩm đã hết hàng.',
+        'Tá»•ng sá»‘ lÆ°á»£ng cÃ¡c phÃ¢n loáº¡i trong giá» vÆ°á»£t quÃ¡ tá»“n kho hiá»‡n cÃ³.',
         $returnUrl
     );
 }
 
-if ($requestedQuantity > $stock) {
-    redirectAfterCartAdd(
-        'error',
-        'Số lượng yêu cầu vượt quá tồn kho hiện có.',
-        $returnUrl
-    );
-}
+$cart[$lineKey] = [
+    'product_id' => $productId,
+    'quantity' => $currentLineQuantity + $requestedQuantity,
+    'size' => $size,
+    'color' => $color,
+];
 
-$cart = $_SESSION['cart'] ?? [];
-
-if (!is_array($cart)) {
-    $cart = [];
-}
-
-$currentQuantityValue = $cart[$productId] ?? 0;
-$currentQuantity = filter_var($currentQuantityValue, FILTER_VALIDATE_INT, [
-    'options' => ['min_range' => 1],
-]);
-$currentQuantity = $currentQuantity !== false ? (int) $currentQuantity : 0;
-$newQuantity = $currentQuantity + $requestedQuantity;
-
-if ($newQuantity > $stock) {
-    redirectAfterCartAdd(
-        'error',
-        'Tổng số lượng trong giỏ vượt quá tồn kho. Hiện bạn đã có '
-        . $currentQuantity
-        . ' sản phẩm này trong giỏ.',
-        $returnUrl
-    );
-}
-
-$cart[$productId] = $newQuantity;
 $_SESSION['cart'] = $cart;
 
-redirectAfterCartAdd(
-    'success',
-    'Đã thêm '
+$variant = [];
+
+if ($size !== '') {
+    $variant[] = 'size ' . $size;
+}
+
+if ($color !== '') {
+    $variant[] = 'mÃ u ' . $color;
+}
+
+$message = 'ÄÃ£ thÃªm '
     . $requestedQuantity
-    . ' × '
-    . (string) $product['name']
-    . ' vào giỏ hàng.',
-    $returnUrl
-);
+    . ' Ã— '
+    . (string)$product['name'];
+
+if ($variant !== []) {
+    $message .= ' (' . implode(', ', $variant) . ')';
+}
+
+$message .= ' vÃ o giá» hÃ ng.';
+
+redirectAfterCartAdd('success', $message, $returnUrl);

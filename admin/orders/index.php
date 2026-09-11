@@ -81,7 +81,7 @@ $flash = pull_admin_flash();
 
 <!-- === FULL ORDERS ADMIN LINK START === -->
 <a
-    href="../orders-full/index.php"
+    href="../orders/index.php"
     style="
         position:fixed;
         right:24px;
