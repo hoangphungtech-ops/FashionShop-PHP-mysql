@@ -54,6 +54,69 @@ $role = $user['role'];
 
 /*
 |--------------------------------------------------------------------------
+| Lấy danh sách đơn hàng của user hiện tại
+|--------------------------------------------------------------------------
+*/
+
+$orders = [];
+$order_items = [];
+
+$order_stmt = $conn->prepare(
+    "SELECT id, receiver_name, phone, address, total_amount, status, created_at
+     FROM orders
+     WHERE user_id = ?
+     ORDER BY created_at DESC"
+);
+$order_stmt->bind_param('i', $user_id);
+$order_stmt->execute();
+$order_result = $order_stmt->get_result();
+
+while ($order = $order_result->fetch_assoc()) {
+    $orders[] = $order;
+}
+$order_stmt->close();
+
+if (!empty($orders)) {
+    $order_ids = array_column($orders, 'id');
+    $placeholders = implode(',', array_fill(0, count($order_ids), '?'));
+    $types = str_repeat('i', count($order_ids));
+
+    $item_stmt = $conn->prepare(
+        "SELECT oi.order_id, oi.quantity, oi.price,
+                p.name AS product_name, p.image AS product_image
+         FROM order_items oi
+         LEFT JOIN products p ON oi.product_id = p.id
+         WHERE oi.order_id IN ($placeholders)
+         ORDER BY oi.id ASC"
+    );
+    $item_stmt->bind_param($types, ...$order_ids);
+    $item_stmt->execute();
+    $item_result = $item_stmt->get_result();
+
+    while ($item = $item_result->fetch_assoc()) {
+        $order_items[$item['order_id']][] = $item;
+    }
+    $item_stmt->close();
+}
+
+$status_text = [
+    'pending' => 'Chờ xác nhận',
+    'confirmed' => 'Đã xác nhận',
+    'shipping' => 'Đang giao hàng',
+    'completed' => 'Đã hoàn thành',
+    'cancelled' => 'Đã hủy'
+];
+
+$status_class = [
+    'pending' => 'status-pending',
+    'confirmed' => 'status-confirmed',
+    'shipping' => 'status-shipping',
+    'completed' => 'status-completed',
+    'cancelled' => 'status-cancelled'
+];
+
+/*
+|--------------------------------------------------------------------------
 | Cập nhật thông tin
 |--------------------------------------------------------------------------
 */
@@ -337,6 +400,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 0 8px;
         }
 
+
+        /* Đơn hàng của tôi - phần được thêm vào */
+        .orders-section {
+            margin-top: 30px;
+            padding-top: 25px;
+            border-top: 1px solid #ddd;
+        }
+        .orders-section h3 { margin-bottom: 18px; }
+        .order-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 18px;
+            background: #fff;
+        }
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .order-status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-confirmed { background: #cff4fc; color: #055160; }
+        .status-shipping { background: #cfe2ff; color: #084298; }
+        .status-completed { background: #d1e7dd; color: #0f5132; }
+        .status-cancelled { background: #f8d7da; color: #842029; }
+        .order-info {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 12px;
+        }
+        .order-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-top: 1px solid #eee;
+        }
+        .order-item img {
+            width: 65px;
+            height: 65px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+        .order-item-info { flex: 1; }
+        .order-item-name { font-weight: bold; margin-bottom: 5px; }
+        .order-item-price { color: #555; font-size: 14px; }
+        .order-total {
+            text-align: right;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #ddd;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .no-orders {
+            background: #f7f7f7;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: #666;
+        }
+
     </style>
 
 </head>
@@ -458,6 +595,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </button>
 
     </form>
+
+
+    <!-- Đơn hàng của tôi - phần được thêm vào -->
+    <div class="orders-section">
+        <h3>Đơn hàng của tôi</h3>
+
+        <?php if (empty($orders)): ?>
+
+            <div class="no-orders">
+                Bạn chưa có đơn hàng nào.
+            </div>
+
+        <?php else: ?>
+
+            <?php foreach ($orders as $order): ?>
+
+                <div class="order-card">
+
+                    <div class="order-header">
+                        <strong>Đơn hàng #<?= htmlspecialchars($order['id']) ?></strong>
+
+                        <span class="order-status <?= htmlspecialchars($status_class[$order['status']] ?? '') ?>">
+                            <?= htmlspecialchars($status_text[$order['status']] ?? $order['status']) ?>
+                        </span>
+                    </div>
+
+                    <div class="order-info">
+                        <div>
+                            <strong>Người nhận:</strong>
+                            <?= htmlspecialchars($order['receiver_name']) ?>
+                        </div>
+                        <div>
+                            <strong>Số điện thoại:</strong>
+                            <?= htmlspecialchars($order['phone']) ?>
+                        </div>
+                        <div>
+                            <strong>Địa chỉ:</strong>
+                            <?= htmlspecialchars($order['address']) ?>
+                        </div>
+                        <div>
+                            <strong>Ngày đặt:</strong>
+                            <?= date('d/m/Y H:i', strtotime($order['created_at'])) ?>
+                        </div>
+                    </div>
+
+                    <?php if (!empty($order_items[$order['id']])): ?>
+
+                        <?php foreach ($order_items[$order['id']] as $item): ?>
+
+                            <div class="order-item">
+
+                                <?php if (!empty($item['product_image'])): ?>
+                                    <img
+                                        src="../<?= htmlspecialchars($item['product_image']) ?>"
+                                        alt="<?= htmlspecialchars($item['product_name'] ?? 'Sản phẩm') ?>"
+                                    >
+                                <?php endif; ?>
+
+                                <div class="order-item-info">
+                                    <div class="order-item-name">
+                                        <?= htmlspecialchars($item['product_name'] ?? 'Sản phẩm đã xóa') ?>
+                                    </div>
+
+                                    <div class="order-item-price">
+                                        <?= number_format((float)$item['price'], 0, ',', '.') ?> đ
+                                        × <?= (int)$item['quantity'] ?>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        <?php endforeach; ?>
+
+                    <?php endif; ?>
+
+                    <div class="order-total">
+                        Tổng tiền:
+                        <?= number_format((float)$order['total_amount'], 0, ',', '.') ?> đ
+                    </div>
+
+                </div>
+
+            <?php endforeach; ?>
+
+        <?php endif; ?>
+    </div>
 
     <div class="links">
 
