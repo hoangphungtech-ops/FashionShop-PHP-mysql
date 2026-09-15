@@ -187,13 +187,17 @@ function currentCartQuantityCount(): int
 
     $count = 0;
 
-    foreach ($cart as $quantity) {
-        $validatedQuantity = filter_var($quantity, FILTER_VALIDATE_INT, [
+    foreach ($cart as $value) {
+        $quantityValue = is_array($value)
+            ? ($value['quantity'] ?? null)
+            : $value;
+
+        $quantity = filter_var($quantityValue, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1],
         ]);
 
-        if ($validatedQuantity !== false) {
-            $count += (int) $validatedQuantity;
+        if ($quantity !== false) {
+            $count += (int)$quantity;
         }
     }
 
@@ -508,7 +512,126 @@ $pageTitle = $product !== null ? $productName : 'Không tìm thấy sản phẩm
                         >
                             <?= $isAvailable ? 'Thêm vào giỏ hàng' : 'Sản phẩm hết hàng' ?>
                         </button>
-                    </form>
+                    <!-- PRODUCT_VARIANT_FORM_PATCH_BEGIN -->
+<?php
+$variantProductId = (int)($product['id'] ?? ($_GET['id'] ?? 0));
+$variantSizes = [];
+$variantColors = [];
+$variantMaterial = '';
+
+if ($variantProductId > 0) {
+    try {
+        $variantStatement = $pdo->prepare(
+            'SELECT size, color, material
+             FROM products
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $variantStatement->execute([':id' => $variantProductId]);
+        $variantRow = $variantStatement->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $variantParse = static function (mixed $value): array {
+            $value = trim((string)$value);
+
+            if ($value === '') {
+                return [];
+            }
+
+            $items = [];
+
+            foreach (explode(',', $value) as $item) {
+                $item = trim($item);
+
+                if ($item !== '' && !in_array($item, $items, true)) {
+                    $items[] = $item;
+                }
+            }
+
+            return $items;
+        };
+
+        $variantSizes = $variantParse($variantRow['size'] ?? '');
+        $variantColors = $variantParse($variantRow['color'] ?? '');
+        $variantMaterial = trim((string)($variantRow['material'] ?? ''));
+    } catch (Throwable $variantException) {
+        error_log('[product-variant-ui] ' . $variantException->getMessage());
+    }
+}
+?>
+
+<?php if ($variantSizes !== [] || $variantColors !== [] || $variantMaterial !== ''): ?>
+<style>
+.product-variant-form-patch{margin:18px 0;display:grid;gap:14px}
+.product-variant-form-patch__label{display:block;margin-bottom:8px;font-weight:700;color:#263126}
+.product-variant-form-patch__sizes{display:flex;flex-wrap:wrap;gap:8px}
+.product-variant-form-patch__size{position:relative;cursor:pointer}
+.product-variant-form-patch__size input{position:absolute;opacity:0;pointer-events:none}
+.product-variant-form-patch__size span{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:40px;padding:0 12px;border:1px solid #cfd8d1;background:#fff;color:#263126;transition:.18s}
+.product-variant-form-patch__size input:checked + span{border-color:#263126;background:#263126;color:#fff}
+.product-variant-form-patch select{width:100%;max-width:300px;min-height:42px;padding:8px 10px;border:1px solid #cfd8d1;background:#fff;color:#263126}
+.product-variant-form-patch__value{display:inline-block;padding:8px 11px;border:1px solid #dce2da;background:#f8faf8;color:#4f5e54}
+</style>
+
+<div class="product-variant-form-patch">
+    <?php if ($variantSizes !== []): ?>
+        <div>
+            <span class="product-variant-form-patch__label">KÃ­ch cá»¡</span>
+            <div class="product-variant-form-patch__sizes">
+                <?php foreach ($variantSizes as $variantSize): ?>
+                    <label class="product-variant-form-patch__size">
+                        <input
+                            type="radio"
+                            name="size"
+                            value="<?= htmlspecialchars($variantSize, ENT_QUOTES, 'UTF-8') ?>"
+                            required
+                        >
+                        <span><?= htmlspecialchars($variantSize, ENT_QUOTES, 'UTF-8') ?></span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php if (count($variantColors) === 1): ?>
+        <div>
+            <span class="product-variant-form-patch__label">MÃ u sáº¯c</span>
+            <input
+                type="hidden"
+                name="color"
+                value="<?= htmlspecialchars($variantColors[0], ENT_QUOTES, 'UTF-8') ?>"
+            >
+            <span class="product-variant-form-patch__value">
+                <?= htmlspecialchars($variantColors[0], ENT_QUOTES, 'UTF-8') ?>
+            </span>
+        </div>
+    <?php elseif (count($variantColors) > 1): ?>
+        <div>
+            <label class="product-variant-form-patch__label" for="product-color">
+                MÃ u sáº¯c
+            </label>
+            <select id="product-color" name="color" required>
+                <option value="">Chá»n mÃ u</option>
+                <?php foreach ($variantColors as $variantColor): ?>
+                    <option value="<?= htmlspecialchars($variantColor, ENT_QUOTES, 'UTF-8') ?>">
+                        <?= htmlspecialchars($variantColor, ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($variantMaterial !== ''): ?>
+        <div>
+            <span class="product-variant-form-patch__label">Cháº¥t liá»‡u</span>
+            <span class="product-variant-form-patch__value">
+                <?= htmlspecialchars($variantMaterial, ENT_QUOTES, 'UTF-8') ?>
+            </span>
+        </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+<!-- PRODUCT_VARIANT_FORM_PATCH_END -->
+</form>
 
                     <ul class="product-detail-services" aria-label="Dịch vụ mua hàng">
                         <li>Giao hàng toàn quốc</li>
