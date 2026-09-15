@@ -139,3 +139,58 @@
         updateQuantity(input.value);
     });
 })();
+
+// Home V2 navigation + sticky header.
+(() => {
+    "use strict";
+
+    const header = document.querySelector("[data-home-header]");
+    const toggle = header?.querySelector("[data-home-menu-toggle]");
+    const nav = header?.querySelector("[data-home-nav]");
+
+    if (!header || !toggle || !nav) {
+        return;
+    }
+
+    const setOpen = (open) => {
+        header.classList.toggle("is-menu-open", open);
+        toggle.setAttribute("aria-expanded", String(open));
+        toggle.setAttribute("aria-label", open ? "Đóng menu" : "Mở menu");
+        document.body.classList.toggle("has-open-menu", open);
+    };
+
+    toggle.addEventListener("click", () => {
+        setOpen(!header.classList.contains("is-menu-open"));
+    });
+
+    nav.addEventListener("click", (event) => {
+        if (event.target.closest("a")) {
+            setOpen(false);
+        }
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!header.contains(event.target)) {
+            setOpen(false);
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            setOpen(false);
+        }
+    });
+
+    const syncHeader = () => {
+        header.classList.toggle("is-scrolled", window.scrollY > 8);
+    };
+
+    syncHeader();
+    window.addEventListener("scroll", syncHeader, { passive: true });
+
+    window.addEventListener("resize", () => {
+        if (window.innerWidth > 960) {
+            setOpen(false);
+        }
+    });
+})();

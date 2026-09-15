@@ -512,6 +512,7 @@ $pageTitle = $product !== null ? $productName : 'Không tìm thấy sản phẩm
                         >
                             <?= $isAvailable ? 'Thêm vào giỏ hàng' : 'Sản phẩm hết hàng' ?>
                         </button>
+<<<<<<< HEAD
                     <!-- PRODUCT_VARIANT_FORM_PATCH_BEGIN -->
 <?php
 $variantProductId = (int)($product['id'] ?? ($_GET['id'] ?? 0));
@@ -631,6 +632,8 @@ if ($variantProductId > 0) {
 </div>
 <?php endif; ?>
 <!-- PRODUCT_VARIANT_FORM_PATCH_END -->
+=======
+>>>>>>> b0fa476 (merge: Phung, Ngan, Nghi and Hoang edit & cap nhat)
 </form>
 
                     <ul class="product-detail-services" aria-label="Dịch vụ mua hàng">
@@ -894,9 +897,6 @@ main h1 *,
         applyFix();
     }
 
-    /*
-     * Chạy lại sau JS giao diện cũ.
-     */
     setTimeout(applyFix, 100);
     setTimeout(applyFix, 500);
     setTimeout(applyFix, 1500);
@@ -905,9 +905,7 @@ main h1 *,
 
 </script>
 
-<!-- === HARD PRODUCT TITLE FIX END === -->
 
-<!-- === FINAL PRODUCT VARIANT UI START === -->
 <?php
 require_once __DIR__ . '/../includes/product_variant_ui.php';
 
@@ -918,7 +916,3 @@ if (
     fashion_render_variant_ui($product);
 }
 ?>
-<!-- === FINAL PRODUCT VARIANT UI END === -->
-
-</body>
-</html>
