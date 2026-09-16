@@ -49,3 +49,10 @@ database/*-before-*
 /PRODUCTION_*/
 /database/FINAL_VARIANT_BACKUP_*/
 /database/ROUTE_FIX_BACKUP_*/
+DEPLOY_*/
+PRODUCTION_*/
+database/FINAL_VARIANT_BACKUP_*/
+database/ROUTE_FIX_BACKUP_*/
+database/detail_before_variant_ui_*.php
+assets/images/Ablum/*.txt
+assets/images/Ablum/notes/

@@ -575,7 +575,7 @@ if ($variantProductId > 0) {
 <div class="product-variant-form-patch">
     <?php if ($variantSizes !== []): ?>
         <div>
-            <span class="product-variant-form-patch__label">KÃ­ch cá»¡</span>
+            <span class="product-variant-form-patch__label">Kích cỡ</span>
             <div class="product-variant-form-patch__sizes">
                 <?php foreach ($variantSizes as $variantSize): ?>
                     <label class="product-variant-form-patch__size">
@@ -594,7 +594,7 @@ if ($variantProductId > 0) {
 
     <?php if (count($variantColors) === 1): ?>
         <div>
-            <span class="product-variant-form-patch__label">MÃ u sáº¯c</span>
+            <span class="product-variant-form-patch__label">Màu sắc</span>
             <input
                 type="hidden"
                 name="color"
@@ -607,10 +607,10 @@ if ($variantProductId > 0) {
     <?php elseif (count($variantColors) > 1): ?>
         <div>
             <label class="product-variant-form-patch__label" for="product-color">
-                MÃ u sáº¯c
+                Màu sắc
             </label>
             <select id="product-color" name="color" required>
-                <option value="">Chá»n mÃ u</option>
+                <option value="">Chọn màu</option>
                 <?php foreach ($variantColors as $variantColor): ?>
                     <option value="<?= htmlspecialchars($variantColor, ENT_QUOTES, 'UTF-8') ?>">
                         <?= htmlspecialchars($variantColor, ENT_QUOTES, 'UTF-8') ?>
@@ -622,7 +622,7 @@ if ($variantProductId > 0) {
 
     <?php if ($variantMaterial !== ''): ?>
         <div>
-            <span class="product-variant-form-patch__label">Cháº¥t liá»‡u</span>
+            <span class="product-variant-form-patch__label">Chất liệu</span>
             <span class="product-variant-form-patch__value">
                 <?= htmlspecialchars($variantMaterial, ENT_QUOTES, 'UTF-8') ?>
             </span>
