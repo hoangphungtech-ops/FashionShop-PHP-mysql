@@ -220,6 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-decoration: none;
         }
     </style>
+    <link rel="stylesheet" href="../assets/css/buttons.css?v=20260914">
 </head>
 
 <body>

@@ -123,6 +123,111 @@ $total = (float)$cartData['total'];
 $cartFlash = pull_cart_flash();
 $hasMissingProducts = $cartData['missingLines'] !== [];
 $cartCount = cart_quantity_count($cart);
+
+$recentOrders = [];
+$recentOrderItems = [];
+$orderHistoryError = '';
+
+try {
+    $sessionUser = $_SESSION['user'] ?? null;
+    $historyUserIdValue = is_array($sessionUser) ? ($sessionUser['id'] ?? null) : null;
+    $historyUserId = filter_var(
+        $historyUserIdValue,
+        FILTER_VALIDATE_INT,
+        ['options' => ['min_range' => 1]]
+    );
+    $historyUserId = $historyUserId !== false ? (int)$historyUserId : null;
+
+    $guestRecentOrderIds = array_values(array_filter(array_map(
+        'intval',
+        is_array($_SESSION['recent_order_ids'] ?? null) ? $_SESSION['recent_order_ids'] : []
+    ), static fn (int $id): bool => $id > 0));
+
+    if ($historyUserId !== null) {
+        $recentOrdersStatement = $pdo->prepare(
+            'SELECT id, total_amount, status, created_at
+             FROM orders
+             WHERE user_id = :user_id
+             ORDER BY id DESC
+             LIMIT 3'
+        );
+        $recentOrdersStatement->execute([':user_id' => $historyUserId]);
+        $recentOrders = $recentOrdersStatement->fetchAll(PDO::FETCH_ASSOC);
+    } elseif ($guestRecentOrderIds !== []) {
+        $guestRecentOrderIds = array_slice(array_reverse(array_unique($guestRecentOrderIds)), 0, 3);
+        $placeholders = implode(',', array_fill(0, count($guestRecentOrderIds), '?'));
+        $recentOrdersStatement = $pdo->prepare(
+            "SELECT id, total_amount, status, created_at
+             FROM orders
+             WHERE user_id IS NULL AND id IN ($placeholders)
+             ORDER BY id DESC"
+        );
+        $recentOrdersStatement->execute($guestRecentOrderIds);
+        $recentOrders = $recentOrdersStatement->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    if ($recentOrders !== []) {
+        $recentIds = array_map(static fn (array $order): int => (int)$order['id'], $recentOrders);
+        $placeholders = implode(',', array_fill(0, count($recentIds), '?'));
+
+        $recentItemsStatement = $pdo->prepare(
+            "SELECT oi.order_id, oi.quantity, p.image
+             FROM order_items oi
+             LEFT JOIN products p ON p.id = oi.product_id
+             WHERE oi.order_id IN ($placeholders)
+             ORDER BY oi.id ASC"
+        );
+        $recentItemsStatement->execute($recentIds);
+
+        foreach ($recentItemsStatement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $orderId = (int)$row['order_id'];
+
+            if (!isset($recentOrderItems[$orderId])) {
+                $recentOrderItems[$orderId] = [
+                    'quantity' => 0,
+                    'images' => [],
+                ];
+            }
+
+            $recentOrderItems[$orderId]['quantity'] += max(0, (int)$row['quantity']);
+
+            if (
+                count($recentOrderItems[$orderId]['images']) < 2
+                && is_string($row['image'] ?? null)
+                && trim((string)$row['image']) !== ''
+            ) {
+                $recentOrderItems[$orderId]['images'][] = (string)$row['image'];
+            }
+        }
+    }
+} catch (PDOException $exception) {
+    error_log('[cart-recent-orders] Cannot load recent orders: ' . $exception->getMessage());
+    $orderHistoryError = 'Chưa thể tải đơn hàng gần đây.';
+}
+
+$statusLabels = order_status_labels();
+
+$formatOrderDate = static function (mixed $date): string {
+    $timestamp = strtotime((string)$date);
+    return $timestamp !== false ? date('d/m/Y', $timestamp) : (string)$date;
+};
+
+$statusClass = static function (string $status): string {
+    return in_array($status, ['pending', 'confirmed', 'shipping', 'completed', 'cancelled'], true)
+        ? $status
+        : 'pending';
+};
+
+$statusStep = static function (string $status): int {
+    return match ($status) {
+        'pending' => 1,
+        'confirmed' => 2,
+        'shipping' => 3,
+        'completed' => 4,
+        default => 0,
+    };
+};
+
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -739,268 +844,251 @@ $cartCount = cart_quantity_count($cart);
             }
         }
 
-    
 
-        /* ===== FashionShop Empty Cart Modern v4.2 CLEAN ===== */
-        .cart-page{
-            background:#fbfaf6 !important;
+        /* ===== Recent orders + history actions v3 ===== */
+        .cart-page .order-summary__history{
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            width:100%;
+            min-height:44px;
+            margin-top:10px;
+            border:1px solid #bfd0c7;
+            border-radius:12px;
+            background:#fff;
+            color:var(--fs-green);
+            font-size:12px;
+            font-weight:800;
+            text-decoration:none;
+            transition:.2s ease;
         }
-
-        .cart-page .page-intro{
-            position:relative;
-            overflow:hidden;
-            min-height:0 !important;
-            padding:32px 0 28px !important;
-            margin:0 !important;
-            background:
-                radial-gradient(circle at 7% 16%, rgba(111,137,116,.10), transparent 18%),
-                radial-gradient(circle at 76% 30%, rgba(226,212,190,.34), transparent 28%),
-                linear-gradient(90deg,#fbf8f1 0%,#f9f7f1 68%,#f0eadf 100%) !important;
-            border-bottom:1px solid #e7e4dc !important;
+        .cart-page .order-summary__history:hover{
+            background:#f1f6f3;
+            border-color:#9eb7aa;
+            transform:translateY(-1px);
         }
-
-        .cart-page .page-intro::before{
-            content:"";
-            position:absolute;
-            inset:0 0 0 auto;
-            width:34%;
-            background:
-                linear-gradient(151deg, transparent 0 47%, rgba(88,111,92,.08) 47% 64%, transparent 64%),
-                radial-gradient(circle at 82% 70%, rgba(62,91,70,.14), transparent 15%);
-            pointer-events:none;
+        .cart-page .empty-state__actions{
+            display:flex;
+            justify-content:center;
+            flex-wrap:wrap;
+            gap:10px;
+            margin-top:20px;
         }
-
-        .cart-page .page-intro .site-container{
-            position:relative;
-            z-index:1;
-            max-width:1320px;
-        }
-
-        .cart-page .breadcrumb{
-            margin-bottom:16px !important;
-            font-size:12px !important;
-            color:#7d877f !important;
-        }
-
-        .cart-page .page-intro__content{
-            max-width:620px !important;
-        }
-
-        .cart-page .page-intro .eyebrow{
+        .cart-page .button--secondary-modern{
             display:inline-flex;
             align-items:center;
-            gap:13px;
-            margin:0 0 8px !important;
-            color:#6f8b7c !important;
-            font-size:10px !important;
-            font-weight:850 !important;
-            letter-spacing:.2em !important;
+            justify-content:center;
+            min-height:44px;
+            padding:0 18px;
+            border:1px solid #b9c9c0;
+            border-radius:10px;
+            background:#fff;
+            color:var(--fs-green);
+            font-weight:750;
+            text-decoration:none;
+        }
+        .recent-orders{
+            padding:0 0 72px;
+        }
+        .recent-orders .site-container{
+            max-width:1320px;
+        }
+        .recent-orders__head{
+            display:flex;
+            align-items:end;
+            justify-content:space-between;
+            gap:20px;
+            margin-bottom:18px;
+        }
+        .recent-orders__head p{
+            margin:0 0 5px;
+            color:#7d9588;
+            font-size:10px;
+            font-weight:800;
+            letter-spacing:.16em;
             text-transform:uppercase;
         }
-
-        .cart-page .page-intro .eyebrow::after{
+        .recent-orders__head h2{
+            margin:0;
+            color:var(--fs-ink);
+            font-size:25px;
+            line-height:1.2;
+            letter-spacing:-.02em;
+        }
+        .recent-orders__head > a{
+            color:var(--fs-green);
+            font-size:12px;
+            font-weight:800;
+            text-decoration:none;
+            white-space:nowrap;
+        }
+        .recent-orders__grid{
+            display:grid;
+            grid-template-columns:repeat(3,minmax(0,1fr));
+            gap:14px;
+        }
+        .recent-order{
+            min-width:0;
+            padding:18px;
+            border:1px solid var(--fs-line);
+            border-radius:16px;
+            background:#fff;
+            box-shadow:0 12px 28px rgba(24,43,34,.06);
+        }
+        .recent-order__top{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:12px;
+        }
+        .recent-order__identity{
+            display:flex;
+            align-items:center;
+            gap:11px;
+            min-width:0;
+        }
+        .recent-order__images{
+            display:flex;
+            flex:0 0 auto;
+        }
+        .recent-order__images img,
+        .recent-order__image-placeholder{
+            width:42px;
+            height:50px;
+            object-fit:cover;
+            border:2px solid #fff;
+            border-radius:9px;
+            background:#f0f2ee;
+        }
+        .recent-order__images img + img{
+            margin-left:-12px;
+        }
+        .recent-order__meta{
+            min-width:0;
+        }
+        .recent-order__meta strong{
+            display:block;
+            color:var(--fs-ink);
+            font-size:13px;
+            line-height:1.3;
+        }
+        .recent-order__meta span{
+            display:block;
+            margin-top:3px;
+            color:#7b8780;
+            font-size:10px;
+        }
+        .order-status{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:6px 9px;
+            border-radius:999px;
+            font-size:10px;
+            font-weight:800;
+            white-space:nowrap;
+        }
+        .order-status::before{
             content:"";
-            width:52px;
-            height:1px;
-            background:#b9ae9b;
+            width:7px;
+            height:7px;
+            border-radius:50%;
+            background:currentColor;
         }
-
-        .cart-page .page-intro h1{
-            margin:0 0 8px !important;
-            color:#103b2f !important;
-            font-family:Georgia,"Times New Roman",serif !important;
-            font-size:clamp(48px,5vw,70px) !important;
-            font-weight:500 !important;
-            line-height:1 !important;
-            letter-spacing:-.045em !important;
+        .order-status--pending{background:#fff5db;color:#94691c}
+        .order-status--confirmed{background:#e9f1ff;color:#3268a8}
+        .order-status--shipping{background:#fff0df;color:#ae6419}
+        .order-status--completed{background:#e5f5ea;color:#277449}
+        .order-status--cancelled{background:#fdeaea;color:#a64747}
+        .recent-order__price{
+            display:flex;
+            align-items:end;
+            justify-content:space-between;
+            gap:12px;
+            margin-top:14px;
         }
-
-        .cart-page .page-intro__content > p:last-child{
-            margin:0 !important;
-            color:#69756e !important;
-            font-size:14px !important;
-            line-height:1.6;
+        .recent-order__price span{
+            color:#7d8881;
+            font-size:10px;
         }
-
-        .cart-page .cart-section{
+        .recent-order__price strong{
+            color:var(--fs-green);
+            font-size:16px;
+        }
+        .order-progress{
+            display:grid;
+            grid-template-columns:repeat(4,1fr);
+            gap:0;
+            margin-top:15px;
+        }
+        .order-progress__step{
             position:relative;
-            overflow:hidden;
-            padding:38px 0 72px !important;
-            background:
-                radial-gradient(circle at 2% 91%, rgba(105,133,112,.15), transparent 15%),
-                radial-gradient(circle at 97% 85%, rgba(222,202,173,.18), transparent 18%),
-                #fbfaf6 !important;
-        }
-
-        .cart-page .cart-section::after{
-            content:"";
-            position:absolute;
-            right:-155px;
-            bottom:-195px;
-            width:390px;
-            height:390px;
-            border:1px solid rgba(186,146,91,.34);
-            border-radius:48% 52% 57% 43%;
-            transform:rotate(20deg);
-            pointer-events:none;
-        }
-
-        .cart-page .empty-state--cart{
-            position:relative;
-            z-index:1;
-            width:min(820px,calc(100% - 32px));
-            margin:0 auto !important;
-            padding:42px 34px 38px !important;
-            border:1px solid #e5e1d9 !important;
-            border-radius:22px !important;
-            background:
-                radial-gradient(circle at 50% 12%, rgba(237,229,216,.34), transparent 28%),
-                linear-gradient(180deg,#fff 0%,#fffefb 100%) !important;
-            box-shadow:0 18px 45px rgba(41,53,45,.08) !important;
+            padding-top:15px;
+            color:#9aa49e;
+            font-size:8px;
             text-align:center;
         }
-
-        .cart-page .empty-state--cart::before,
-        .cart-page .empty-state--cart::after{
-            content:none !important;
-            display:none !important;
+        .order-progress__step::before{
+            content:"";
+            position:absolute;
+            top:3px;
+            left:50%;
+            z-index:2;
+            width:8px;
+            height:8px;
+            border:2px solid #b9c5be;
+            border-radius:50%;
+            background:#fff;
+            transform:translateX(-50%);
         }
-
-        .cart-page .empty-cart-illustration{
-            width:128px;
-            height:110px;
-            margin:0 auto 14px;
-            color:#12483a;
-        }
-
-        .cart-page .empty-cart-illustration svg{
-            display:block;
+        .order-progress__step:not(:last-child)::after{
+            content:"";
+            position:absolute;
+            top:7px;
+            left:50%;
             width:100%;
-            height:100%;
+            height:1px;
+            background:#cfd7d2;
         }
-
-        .cart-page .empty-state--cart .eyebrow{
-            margin:0 0 8px !important;
-            color:#718b7c !important;
-            font-size:10px !important;
-            font-weight:850 !important;
-            letter-spacing:.22em !important;
-            text-transform:uppercase;
+        .order-progress__step.is-active{
+            color:var(--fs-green);
+            font-weight:700;
         }
-
-        .cart-page .empty-state--cart h2{
-            margin:0 0 8px !important;
-            color:#103b2f !important;
-            font-family:"Segoe UI",Arial,sans-serif !important;
-            font-size:clamp(34px,3.6vw,48px) !important;
-            font-weight:760 !important;
-            line-height:1.08 !important;
-            letter-spacing:-.035em !important;
-            word-break:normal !important;
-            overflow-wrap:normal !important;
+        .order-progress__step.is-active::before{
+            border-color:var(--fs-green);
+            background:var(--fs-green);
         }
-
-        .cart-page .empty-state--cart > p:not(.eyebrow){
-            margin:0 !important;
-            color:#707b74 !important;
-            font-size:14px !important;
+        .order-progress__step.is-active:not(:last-child)::after{
+            background:var(--fs-green);
         }
-
-        .cart-page .empty-state__actions{
-            display:flex !important;
-            align-items:center !important;
-            justify-content:center !important;
-            flex-wrap:wrap !important;
-            gap:12px !important;
-            margin-top:24px !important;
-        }
-
-        .cart-page .empty-action{
-            position:relative;
-            display:inline-flex !important;
-            align-items:center !important;
-            justify-content:center !important;
-            gap:10px !important;
-            min-width:224px !important;
-            height:50px !important;
-            min-height:50px !important;
-            padding:0 20px !important;
-            border-radius:12px !important;
-            font-size:13px !important;
-            font-weight:800 !important;
-            line-height:1 !important;
-            white-space:nowrap !important;
-            text-decoration:none !important;
-            transition:transform .18s ease,box-shadow .18s ease,background .18s ease;
-        }
-
-        .cart-page .empty-action--primary{
-            border:1px solid #103b2f !important;
-            background:linear-gradient(135deg,#0d3b2e,#14513f) !important;
-            color:#fff !important;
-            box-shadow:0 10px 22px rgba(14,58,45,.15);
-        }
-
-        .cart-page .empty-action--secondary{
-            border:1px solid #7f9d8e !important;
-            background:#fff !important;
-            color:#103b2f !important;
-        }
-
-        .cart-page .empty-action:hover{
-            transform:translateY(-2px);
-            box-shadow:0 12px 24px rgba(23,54,42,.11);
-        }
-
-        .cart-page .empty-action__icon{
-            width:20px;
-            height:20px;
-            flex:0 0 20px;
+        .recent-order__link{
             display:block;
+            margin-top:13px;
+            padding-top:12px;
+            border-top:1px solid #edf0ec;
+            color:var(--fs-green);
+            font-size:11px;
+            font-weight:800;
+            text-decoration:none;
         }
-
-        .cart-page .empty-action__arrow{
-            margin-left:auto;
-            font-size:17px;
-            line-height:1;
+        .recent-orders__empty{
+            padding:20px;
+            border:1px dashed #cbd5cf;
+            border-radius:14px;
+            background:#fbfcfa;
+            color:#6f7b74;
+            font-size:13px;
         }
-
-        @media(max-width:700px){
-            .cart-page .page-intro{
-                padding:24px 0 22px !important;
-            }
-
-            .cart-page .page-intro h1{
-                font-size:45px !important;
-            }
-
-            .cart-page .cart-section{
-                padding:24px 0 50px !important;
-            }
-
-            .cart-page .empty-state--cart{
-                width:calc(100% - 24px);
-                padding:30px 18px 28px !important;
-                border-radius:18px !important;
-            }
-
-            .cart-page .empty-cart-illustration{
-                width:110px;
-                height:94px;
-            }
-
-            .cart-page .empty-state--cart h2{
-                font-size:34px !important;
-            }
-
-            .cart-page .empty-state__actions{
-                flex-direction:column !important;
-                align-items:stretch !important;
-            }
-
-            .cart-page .empty-action{
-                width:100% !important;
-                min-width:0 !important;
+        @media (max-width:980px){
+            .recent-orders__grid{grid-template-columns:1fr}
+        }
+        @media (max-width:700px){
+            .recent-orders{padding-bottom:48px}
+            .recent-orders__head{
+                align-items:flex-start;
+                flex-direction:column;
+                gap:8px;
             }
         }
 
@@ -1058,33 +1146,9 @@ require __DIR__ . '/../includes/header.php';
                     <p class="eyebrow">Your bag is empty</p>
                     <h2>Giỏ hàng đang trống</h2>
                     <p>Bạn chưa có sản phẩm nào trong giỏ hàng.</p>
-                    <div class="empty-cart-illustration" aria-hidden="true">
-                        <svg viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M36 43h68l-7 59H43l-7-59Z" fill="#F5EBDD" stroke="#CDBFA8" stroke-width="1.4"/>
-                            <path d="M51 46V34c0-12 8-21 19-21s19 9 19 21v12" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                            <path d="M57 68c4 0 7-3 7-7M83 68c-4 0-7-3-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <path d="M70 80c-8-11-20-2-10 7l10 8 10-8c10-9-2-18-10-7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                            <path d="M105 50c9-10 17-14 23-13-1 8-6 15-15 20" stroke="#789482" stroke-width="2" stroke-linecap="round"/>
-                            <path d="M109 62c10-2 18 0 23 5-6 6-14 8-24 5" stroke="#789482" stroke-width="2" stroke-linecap="round"/>
-                            <path d="M30 66h-9M26 59l-6-5M26 73l-6 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                        </svg>
-                    </div>
                     <div class="empty-state__actions">
-                        <a class="empty-action empty-action--primary" href="../products/index.php">
-                            <svg class="empty-action__icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="M6.5 8.5h11l-1 11h-9l-1-11Z" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                                <path d="M9 9V7a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                            </svg>
-                            <span>Khám phá sản phẩm</span>
-                            <span class="empty-action__arrow" aria-hidden="true">→</span>
-                        </a>
-                        <a class="empty-action empty-action--secondary" href="history.php">
-                            <svg class="empty-action__icon" viewBox="0 0 24 24" aria-hidden="true">
-                                <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
-                                <path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <span>Xem lịch sử đơn hàng</span>
-                        </a>
+                        <a class="button button--primary" href="../products/index.php">Khám phá sản phẩm</a>
+                        <a class="button--secondary-modern" href="history.php">Xem lịch sử đơn hàng</a>
                     </div>
                 </div>
             <?php else: ?>
@@ -1178,12 +1242,91 @@ require __DIR__ . '/../includes/header.php';
                            <?= !$cartData['canCheckout'] ? 'aria-disabled="true"' : '' ?>>
                             Thanh toán
                         </a>
+                        <a class="order-summary__history" href="history.php">◷ &nbsp; Xem lịch sử đơn hàng</a>
                         <a class="order-summary__continue" href="../products/index.php">← Tiếp tục mua hàng</a>
                     </aside>
                 </div>
             <?php endif; ?>
         </div>
     </section>
+
+    <section class="recent-orders" aria-labelledby="recent-orders-title">
+        <div class="site-container">
+            <div class="recent-orders__head">
+                <div>
+                    <p>Order tracking</p>
+                    <h2 id="recent-orders-title">Đơn hàng gần đây của bạn</h2>
+                </div>
+                <a href="history.php">Xem tất cả đơn hàng →</a>
+            </div>
+
+            <?php if ($orderHistoryError !== ''): ?>
+                <div class="recent-orders__empty"><?= e($orderHistoryError) ?></div>
+            <?php elseif ($recentOrders === []): ?>
+                <div class="recent-orders__empty">
+                    Chưa có đơn hàng gần đây. Sau khi đặt hàng, trạng thái đơn sẽ hiển thị tại đây.
+                </div>
+            <?php else: ?>
+                <div class="recent-orders__grid">
+                    <?php foreach ($recentOrders as $recentOrder): ?>
+                        <?php
+                        $recentId = (int)$recentOrder['id'];
+                        $recentStatus = (string)$recentOrder['status'];
+                        $recentStatusCss = $statusClass($recentStatus);
+                        $recentStep = $statusStep($recentStatus);
+                        $recentInfo = $recentOrderItems[$recentId] ?? ['quantity' => 0, 'images' => []];
+                        ?>
+                        <article class="recent-order">
+                            <div class="recent-order__top">
+                                <div class="recent-order__identity">
+                                    <div class="recent-order__images" aria-hidden="true">
+                                        <?php if ($recentInfo['images'] === []): ?>
+                                            <span class="recent-order__image-placeholder"></span>
+                                        <?php else: ?>
+                                            <?php foreach ($recentInfo['images'] as $recentImage): ?>
+                                                <img src="<?= e(cart_product_image_url($recentImage)) ?>" alt="">
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="recent-order__meta">
+                                        <strong>#FS<?= $recentId ?></strong>
+                                        <span><?= e($formatOrderDate($recentOrder['created_at'])) ?></span>
+                                    </div>
+                                </div>
+                                <span class="order-status order-status--<?= e($recentStatusCss) ?>">
+                                    <?= e($statusLabels[$recentStatus] ?? $recentStatus) ?>
+                                </span>
+                            </div>
+
+                            <div class="recent-order__price">
+                                <span><?= (int)$recentInfo['quantity'] ?> sản phẩm</span>
+                                <strong><?= number_format((float)$recentOrder['total_amount'], 0, ',', '.') ?>đ</strong>
+                            </div>
+
+                            <?php if ($recentStatus !== 'cancelled'): ?>
+                                <div class="order-progress" aria-label="Tiến trình đơn hàng">
+                                    <?php
+                                    $steps = ['Đặt hàng', 'Xác nhận', 'Đang giao', 'Hoàn thành'];
+                                    foreach ($steps as $index => $stepLabel):
+                                        $stepNumber = $index + 1;
+                                    ?>
+                                        <span class="order-progress__step <?= $stepNumber <= $recentStep ? 'is-active' : '' ?>">
+                                            <?= e($stepLabel) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <a class="recent-order__link" href="Order_detail.php?id=<?= $recentId ?>">
+                                Xem chi tiết đơn hàng →
+                            </a>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </section>
+
 </main>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
 <script src="../assets/js/main.js" defer></script>

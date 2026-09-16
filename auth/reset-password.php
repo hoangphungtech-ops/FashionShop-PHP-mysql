@@ -26,7 +26,7 @@ try {
 } catch (Throwable $e) {
     $error =
         'Không thể kết nối hệ thống. '
-        . 'Vui lòng thử lại sau.';
+        . 'Vui lòng kiểm tra lại cấu hình database.';
 }
 
 function fs_find_reset_token(
@@ -61,7 +61,7 @@ function fs_find_reset_token(
     }
 
     $expiresAt = strtotime(
-        $row['expires_at'] . ' UTC'
+        (string)$row['expires_at'] . ' UTC'
     );
 
     if (
@@ -101,8 +101,13 @@ if (
     }
 
     if ($error === '') {
-        $password = (string)($_POST['password'] ?? '');
-        $confirm = (string)($_POST['password_confirm'] ?? '');
+        $password = (string)(
+            $_POST['password'] ?? ''
+        );
+
+        $confirm = (string)(
+            $_POST['password_confirm'] ?? ''
+        );
 
         if (strlen($password) < 8) {
             $error =
@@ -121,7 +126,6 @@ if (
     if ($error === '') {
         try {
             $schema = fs_user_schema($pdo);
-
             $table = fs_identifier($schema['table']);
             $emailColumn = fs_identifier($schema['email']);
             $passwordColumn =
@@ -174,7 +178,10 @@ if (
             $success = true;
             $tokenRow = null;
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) {
+            if (
+                $pdo instanceof PDO
+                && $pdo->inTransaction()
+            ) {
                 $pdo->rollBack();
             }
 
@@ -201,262 +208,187 @@ $csrfToken = fs_csrf_token();
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-    <title>Đặt lại mật khẩu - FashionShop</title>
-    <link
-        rel="stylesheet"
-        href="../assets/css/style.css"
-    >
-    <style>
-        body.reset-auth-page {
-            min-height: 100vh;
-            margin: 0;
-            background:
-                linear-gradient(
-                    135deg,
-                    #fbfaf6 0%,
-                    #f3f6f2 100%
-                );
-            color: #17362b;
-        }
-
-        .reset-auth-shell {
-            width: min(100% - 32px, 520px);
-            margin: 0 auto;
-            padding: 72px 0;
-        }
-
-        .reset-auth-brand {
-            display: block;
-            margin-bottom: 34px;
-            color: #17362b;
-            font-size: 23px;
-            font-weight: 800;
-            text-decoration: none;
-        }
-
-        .reset-auth-brand span {
-            color: #87a393;
-            font-weight: 400;
-        }
-
-        .reset-auth-card {
-            padding: 38px;
-            border: 1px solid #e2e6e1;
-            background: #fff;
-        }
-
-        .reset-auth-card h1 {
-            margin: 0 0 12px;
-            font-family: Georgia, serif;
-            font-size: 38px;
-            font-weight: 500;
-        }
-
-        .reset-auth-card > p {
-            margin: 0 0 28px;
-            color: #6a756e;
-            line-height: 1.7;
-        }
-
-        .reset-auth-field {
-            margin-bottom: 18px;
-        }
-
-        .reset-auth-field label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .reset-auth-field input {
-            width: 100%;
-            min-height: 50px;
-            box-sizing: border-box;
-            padding: 0 14px;
-            border: 1px solid #dfe4df;
-            font-size: 15px;
-        }
-
-        .reset-auth-submit,
-        .reset-auth-login {
-            width: 100%;
-            min-height: 52px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-            border: 0;
-            background: #17362b;
-            color: #fff;
-            font-weight: 700;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        .reset-auth-error {
-            margin-bottom: 20px;
-            padding: 13px 15px;
-            background: #fff0ed;
-            color: #8b3428;
-            line-height: 1.6;
-        }
-
-        .reset-auth-success {
-            margin-bottom: 24px;
-            padding: 14px 16px;
-            background: #edf5ef;
-            color: #24543d;
-            line-height: 1.6;
-        }
-
-        .reset-auth-back {
-            display: inline-block;
-            margin-top: 22px;
-            color: #17362b;
-            font-weight: 600;
-            text-decoration: none;
-        }
-
-        @media (max-width: 600px) {
-            .reset-auth-shell {
-                padding: 38px 0;
-            }
-
-            .reset-auth-card {
-                padding: 26px 20px;
-            }
-
-            .reset-auth-card h1 {
-                font-size: 32px;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đặt lại mật khẩu - FashionShop</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<style>
+body.reset-auth-page {
+    min-height: 100vh;
+    margin: 0;
+    background: linear-gradient(135deg, #fbfaf6 0%, #f3f6f2 100%);
+    color: #17362b;
+}
+.reset-auth-shell {
+    width: min(100% - 32px, 520px);
+    margin: 0 auto;
+    padding: 72px 0;
+}
+.reset-auth-brand {
+    display: block;
+    margin-bottom: 34px;
+    color: #17362b;
+    font-size: 23px;
+    font-weight: 800;
+    text-decoration: none;
+}
+.reset-auth-brand span {
+    color: #87a393;
+    font-weight: 400;
+}
+.reset-auth-card {
+    padding: 38px;
+    border: 1px solid #e2e6e1;
+    background: #fff;
+}
+.reset-auth-card h1 {
+    margin: 0 0 12px;
+    font-family: Georgia, serif;
+    font-size: 38px;
+    font-weight: 500;
+}
+.reset-auth-card > p {
+    margin: 0 0 28px;
+    color: #6a756e;
+    line-height: 1.7;
+}
+.reset-auth-field {
+    margin-bottom: 18px;
+}
+.reset-auth-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.reset-auth-field input {
+    width: 100%;
+    min-height: 50px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    border: 1px solid #dfe4df;
+    font-size: 15px;
+}
+.reset-auth-submit,
+.reset-auth-login {
+    width: 100%;
+    min-height: 52px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 0;
+    background: #17362b;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+.reset-auth-error {
+    margin-bottom: 20px;
+    padding: 13px 15px;
+    background: #fff0ed;
+    color: #8b3428;
+    line-height: 1.6;
+}
+.reset-auth-success {
+    margin-bottom: 24px;
+    padding: 14px 16px;
+    background: #edf5ef;
+    color: #24543d;
+    line-height: 1.6;
+}
+.reset-auth-back {
+    display: inline-block;
+    margin-top: 22px;
+    color: #17362b;
+    font-weight: 600;
+    text-decoration: none;
+}
+@media (max-width: 600px) {
+    .reset-auth-shell { padding: 38px 0; }
+    .reset-auth-card { padding: 26px 20px; }
+    .reset-auth-card h1 { font-size: 32px; }
+}
+</style>
 </head>
-
 <body class="reset-auth-page">
-
 <main class="reset-auth-shell">
-
-    <a
-        href="../"
-        class="reset-auth-brand"
-    >
-        FASHION<span>SHOP</span>
-    </a>
-
-    <section class="reset-auth-card">
-
-        <h1>Đặt lại mật khẩu</h1>
-
-        <?php if ($success): ?>
-
-            <div class="reset-auth-success">
-                Đặt lại mật khẩu thành công.
-            </div>
-
-            <a
-                class="reset-auth-login"
-                href="login.php"
-            >
-                Đăng nhập ngay
-            </a>
-
-        <?php else: ?>
-
-            <?php if ($error !== ''): ?>
-                <div class="reset-auth-error">
-                    <?= fs_h($error) ?>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($tokenRow): ?>
-
-                <p>
-                    Nhập mật khẩu mới cho tài khoản của bạn.
-                </p>
-
-                <form method="post" autocomplete="off">
-
-                    <input
-                        type="hidden"
-                        name="csrf_token"
-                        value="<?= fs_h($csrfToken) ?>"
-                    >
-
-                    <input
-                        type="hidden"
-                        name="token"
-                        value="<?= fs_h($token) ?>"
-                    >
-
-                    <div class="reset-auth-field">
-                        <label for="password">
-                            Mật khẩu mới
-                        </label>
-
-                        <input
-                            id="password"
-                            name="password"
-                            type="password"
-                            autocomplete="new-password"
-                            minlength="8"
-                            required
-                        >
-                    </div>
-
-                    <div class="reset-auth-field">
-                        <label for="password_confirm">
-                            Xác nhận mật khẩu mới
-                        </label>
-
-                        <input
-                            id="password_confirm"
-                            name="password_confirm"
-                            type="password"
-                            autocomplete="new-password"
-                            minlength="8"
-                            required
-                        >
-                    </div>
-
-                    <button
-                        class="reset-auth-submit"
-                        type="submit"
-                    >
-                        Đặt lại mật khẩu
-                    </button>
-
-                </form>
-
-            <?php else: ?>
-
-                <a
-                    class="reset-auth-login"
-                    href="forgot-password.php"
-                >
-                    Yêu cầu liên kết mới
-                </a>
-
-            <?php endif; ?>
-
-        <?php endif; ?>
-
-        <a
-            class="reset-auth-back"
-            href="login.php"
-        >
-            ← Quay lại đăng nhập
-        </a>
-
-    </section>
-
+<a href="../" class="reset-auth-brand">
+    FASHION<span>SHOP</span>
+</a>
+<section class="reset-auth-card">
+<h1>Đặt lại mật khẩu</h1>
+<?php if ($success): ?>
+<div class="reset-auth-success">
+    Đặt lại mật khẩu thành công.
+</div>
+<a class="reset-auth-login" href="login.php">
+    Đăng nhập ngay
+</a>
+<?php else: ?>
+<?php if ($error !== ''): ?>
+<div class="reset-auth-error">
+    <?= fs_h($error) ?>
+</div>
+<?php endif; ?>
+<?php if ($tokenRow): ?>
+<p>
+    Nhập mật khẩu mới cho tài khoản của bạn.
+</p>
+<form method="post" autocomplete="off">
+<input
+    type="hidden"
+    name="csrf_token"
+    value="<?= fs_h($csrfToken) ?>"
+>
+<input
+    type="hidden"
+    name="token"
+    value="<?= fs_h($token) ?>"
+>
+<div class="reset-auth-field">
+<label for="password">Mật khẩu mới</label>
+<input
+    id="password"
+    name="password"
+    type="password"
+    autocomplete="new-password"
+    minlength="8"
+    required
+>
+</div>
+<div class="reset-auth-field">
+<label for="password_confirm">Xác nhận mật khẩu mới</label>
+<input
+    id="password_confirm"
+    name="password_confirm"
+    type="password"
+    autocomplete="new-password"
+    minlength="8"
+    required
+>
+</div>
+<button
+    class="reset-auth-submit"
+    type="submit"
+>
+    Đặt lại mật khẩu
+</button>
+</form>
+<?php else: ?>
+<a
+    class="reset-auth-login"
+    href="forgot-password.php"
+>
+    Yêu cầu liên kết mới
+</a>
+<?php endif; ?>
+<?php endif; ?>
+<a class="reset-auth-back" href="login.php">
+    ← Quay lại đăng nhập
+</a>
+</section>
 </main>
-
 </body>
 </html>

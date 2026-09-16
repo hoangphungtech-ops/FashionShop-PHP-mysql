@@ -333,10 +333,10 @@ function pull_cart_flash(): ?array
 function order_status_labels(): array
 {
     return [
-        'pending' => 'Chá» xÃ¡c nháº­n',
-        'confirmed' => 'ÄÃ£ xÃ¡c nháº­n',
-        'shipping' => 'Äang giao',
-        'completed' => 'HoÃ n thÃ nh',
-        'cancelled' => 'ÄÃ£ há»§y',
+        'pending' => 'Chờ xác nhận',
+        'confirmed' => 'Đã xác nhận',
+        'shipping' => 'Đang giao hàng',
+        'completed' => 'Hoàn thành',
+        'cancelled' => 'Đã hủy',
     ];
 }

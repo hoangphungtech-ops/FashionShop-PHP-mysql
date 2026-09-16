@@ -23,9 +23,9 @@ if ($orderId === null) {
         $status = is_string($_POST['status'] ?? null) ? $_POST['status'] : '';
 
         if (!is_string($csrfToken) || !csrf_validate($csrfToken)) {
-            admin_flash('error', 'PhiÃªn cáº­p nháº­t Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng thá»­ láº¡i.');
+            admin_flash('error', 'Phiên cập nhật đã hết hạn. Vui lòng thử lại.');
         } elseif (!in_array($status, $allowedStatuses, true)) {
-            admin_flash('error', 'Tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng khÃ´ng há»£p lá»‡.');
+            admin_flash('error', 'Trạng thái đơn hàng không hợp lệ.');
         } else {
             try {
                 $updateStatement = $pdo->prepare(
@@ -38,11 +38,11 @@ if ($orderId === null) {
 
                 admin_flash(
                     'success',
-                    'ÄÃ£ cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng.'
+                    'Đã cập nhật trạng thái đơn hàng.'
                 );
             } catch (PDOException $exception) {
                 error_log('[admin-order-status] Update failed: ' . $exception->getMessage());
-                admin_flash('error', 'ChÆ°a thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng.');
+                admin_flash('error', 'Chưa thể cập nhật trạng thái đơn hàng.');
             }
         }
 
@@ -69,7 +69,7 @@ if ($orderId === null) {
                     oi.selected_size,
                     oi.selected_color,
                     oi.material,
-                    COALESCE(NULLIF(oi.product_name, ''), p.name, 'Sáº£n pháº©m Ä‘Ã£ xÃ³a') AS product_name,
+                    COALESCE(NULLIF(oi.product_name, ''), p.name, 'Sản phẩm đã xóa') AS product_name,
                     COALESCE(NULLIF(oi.product_image, ''), p.image, '') AS product_image
                  FROM order_items oi
                  LEFT JOIN products p ON p.id = oi.product_id
@@ -96,7 +96,7 @@ $flash = pull_admin_flash();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chi tiáº¿t Ä‘Æ¡n hÃ ng | Fashion Shop Admin</title>
+    <title>Chi tiết đơn hàng | Fashion Shop Admin</title>
     <style>
         * { box-sizing: border-box; }
         body { margin:0; font-family:Arial,sans-serif; background:#f5f7f5; color:#263126; }
@@ -125,8 +125,8 @@ $flash = pull_admin_flash();
 <body>
 <main class="container">
     <div class="top">
-        <h1>Chi tiáº¿t Ä‘Æ¡n hÃ ng<?= $order !== null ? ' #' . (int)$order['id'] : '' ?></h1>
-        <a class="back" href="index.php">â† Danh sÃ¡ch Ä‘Æ¡n</a>
+        <h1>Chi tiết đơn hàng<?= $order !== null ? ' #' . (int)$order['id'] : '' ?></h1>
+        <a class="back" href="index.php">← Danh sách đơn</a>
     </div>
 
     <?php if ($flash !== null): ?>
@@ -136,22 +136,22 @@ $flash = pull_admin_flash();
     <?php endif; ?>
 
     <?php if ($order === null): ?>
-        <section class="box"><h2>KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng</h2></section>
+        <section class="box"><h2>Không tìm thấy đơn hàng</h2></section>
     <?php else: ?>
         <section class="box">
-            <h2>ThÃ´ng tin khÃ¡ch hÃ ng</h2>
+            <h2>Thông tin khách hàng</h2>
             <div class="info">
-                <span><strong>KhÃ¡ch hÃ ng:</strong> <?= e($order['receiver_name']) ?></span>
-                <span><strong>Äiá»‡n thoáº¡i:</strong> <?= e($order['phone']) ?></span>
-                <span><strong>Äá»‹a chá»‰:</strong> <?= e($order['address']) ?></span>
-                <span><strong>NgÃ y Ä‘áº·t:</strong> <?= e($order['created_at']) ?></span>
-                <span><strong>Tráº¡ng thÃ¡i:</strong> <?= e($statusLabels[$order['status']] ?? $order['status']) ?></span>
+                <span><strong>Khách hàng:</strong> <?= e($order['receiver_name']) ?></span>
+                <span><strong>Điện thoại:</strong> <?= e($order['phone']) ?></span>
+                <span><strong>Địa chỉ:</strong> <?= e($order['address']) ?></span>
+                <span><strong>Ngày đặt:</strong> <?= e($order['created_at']) ?></span>
+                <span><strong>Trạng thái:</strong> <?= e($statusLabels[$order['status']] ?? $order['status']) ?></span>
             </div>
 
             <form class="status-form" method="post" action="detail.php?id=<?= (int)$order['id'] ?>">
                 <?= csrf_field() ?>
                 <label for="status">
-                    Cáº­p nháº­t tráº¡ng thÃ¡i
+                    Cập nhật trạng thái
                     <select id="status" name="status">
                         <?php foreach ($statusLabels as $statusValue => $statusLabel): ?>
                             <option value="<?= e($statusValue) ?>" <?= $order['status'] === $statusValue ? 'selected' : '' ?>>
@@ -160,20 +160,20 @@ $flash = pull_admin_flash();
                         <?php endforeach; ?>
                     </select>
                 </label>
-                <button type="submit">LÆ°u tráº¡ng thÃ¡i</button>
+                <button type="submit">Lưu trạng thái</button>
             </form>
         </section>
 
         <section class="box table-wrap">
-            <h2>Sáº£n pháº©m trong Ä‘Æ¡n</h2>
+            <h2>Sản phẩm trong đơn</h2>
             <table>
                 <thead>
                     <tr>
-                        <th>Sáº£n pháº©m</th>
-                        <th>PhÃ¢n loáº¡i</th>
-                        <th>ÄÆ¡n giÃ¡</th>
-                        <th>Sá»‘ lÆ°á»£ng</th>
-                        <th>ThÃ nh tiá»n</th>
+                        <th>Sản phẩm</th>
+                        <th>Phân loại</th>
+                        <th>Đơn giá</th>
+                        <th>Số lượng</th>
+                        <th>Thành tiền</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -188,24 +188,24 @@ $flash = pull_admin_flash();
                         </td>
                         <td>
                             <?php if (($item['selected_size'] ?? '') !== ''): ?>
-                                <span class="variant">KÃ­ch cá»¡: <?= e($item['selected_size']) ?></span>
+                                <span class="variant">Kích cỡ: <?= e($item['selected_size']) ?></span>
                             <?php endif; ?>
                             <?php if (($item['selected_color'] ?? '') !== ''): ?>
-                                <span class="variant">MÃ u: <?= e($item['selected_color']) ?></span>
+                                <span class="variant">Màu: <?= e($item['selected_color']) ?></span>
                             <?php endif; ?>
                             <?php if (($item['material'] ?? '') !== ''): ?>
-                                <span class="variant">Cháº¥t liá»‡u: <?= e($item['material']) ?></span>
+                                <span class="variant">Chất liệu: <?= e($item['material']) ?></span>
                             <?php endif; ?>
                         </td>
-                        <td><?= number_format((float)$item['price'], 0, ',', '.') ?>Ä‘</td>
+                        <td><?= number_format((float)$item['price'], 0, ',', '.') ?>đ</td>
                         <td><?= (int)$item['quantity'] ?></td>
-                        <td><?= number_format($subtotal, 0, ',', '.') ?>Ä‘</td>
+                        <td><?= number_format($subtotal, 0, ',', '.') ?>đ</td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
 
-            <p class="total">Tá»•ng tiá»n: <?= number_format((float)$order['total_amount'], 0, ',', '.') ?>Ä‘</p>
+            <p class="total">Tổng tiền: <?= number_format((float)$order['total_amount'], 0, ',', '.') ?>đ</p>
         </section>
     <?php endif; ?>
 </main>
