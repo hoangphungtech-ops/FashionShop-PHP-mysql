@@ -61,7 +61,7 @@ if ($orderId === null) {
                 oi.selected_size,
                 oi.selected_color,
                 oi.material,
-                COALESCE(NULLIF(oi.product_name, ''), p.name, 'Sáº£n pháº©m Ä‘Ã£ xÃ³a') AS product_name,
+                COALESCE(NULLIF(oi.product_name, ''), p.name, 'Sản phẩm đã xóa') AS product_name,
                 COALESCE(NULLIF(oi.product_image, ''), p.image, '') AS product_image
              FROM order_items oi
              LEFT JOIN products p ON p.id = oi.product_id
@@ -82,7 +82,7 @@ $statusLabels = order_status_labels();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chi tiáº¿t Ä‘Æ¡n hÃ ng | Fashion Shop</title>
+    <title>Chi tiết đơn hàng | Fashion Shop</title>
     <style>
         * { box-sizing:border-box; }
         body { margin:0; font-family:Arial,sans-serif; background:#f5f7f5; color:#263126; }
@@ -103,31 +103,31 @@ $statusLabels = order_status_labels();
 <body>
 <main class="container">
     <?php if ($order === null): ?>
-        <div class="box"><h1>KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng</h1><p>ÄÆ¡n khÃ´ng tá»“n táº¡i hoáº·c báº¡n khÃ´ng cÃ³ quyá»n xem.</p></div>
+        <div class="box"><h1>Không tìm thấy đơn hàng</h1><p>Đơn không tồn tại hoặc bạn không có quyền xem.</p></div>
     <?php else: ?>
-        <h1>Chi tiáº¿t Ä‘Æ¡n hÃ ng #<?= (int)$order['id'] ?></h1>
+        <h1>Chi tiết đơn hàng #<?= (int)$order['id'] ?></h1>
 
         <section class="box">
-            <h2>ThÃ´ng tin giao hÃ ng</h2>
+            <h2>Thông tin giao hàng</h2>
             <div class="info">
-                <span><strong>NgÆ°á»i nháº­n:</strong> <?= e($order['receiver_name']) ?></span>
-                <span><strong>Äiá»‡n thoáº¡i:</strong> <?= e($order['phone']) ?></span>
-                <span><strong>Äá»‹a chá»‰:</strong> <?= e($order['address']) ?></span>
-                <span><strong>NgÃ y Ä‘áº·t:</strong> <?= e($order['created_at']) ?></span>
-                <span><strong>Tráº¡ng thÃ¡i:</strong> <?= e($statusLabels[$order['status']] ?? $order['status']) ?></span>
+                <span><strong>Người nhận:</strong> <?= e($order['receiver_name']) ?></span>
+                <span><strong>Điện thoại:</strong> <?= e($order['phone']) ?></span>
+                <span><strong>Địa chỉ:</strong> <?= e($order['address']) ?></span>
+                <span><strong>Ngày đặt:</strong> <?= e($order['created_at']) ?></span>
+                <span><strong>Trạng thái:</strong> <?= e($statusLabels[$order['status']] ?? $order['status']) ?></span>
             </div>
         </section>
 
         <section class="box table-wrap">
-            <h2>Sáº£n pháº©m</h2>
+            <h2>Sản phẩm</h2>
             <table>
                 <thead>
                     <tr>
-                        <th>Sáº£n pháº©m</th>
-                        <th>PhÃ¢n loáº¡i</th>
-                        <th>ÄÆ¡n giÃ¡</th>
-                        <th>Sá»‘ lÆ°á»£ng</th>
-                        <th>ThÃ nh tiá»n</th>
+                        <th>Sản phẩm</th>
+                        <th>Phân loại</th>
+                        <th>Đơn giá</th>
+                        <th>Số lượng</th>
+                        <th>Thành tiền</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -142,28 +142,28 @@ $statusLabels = order_status_labels();
                         </td>
                         <td>
                             <?php if (($item['selected_size'] ?? '') !== ''): ?>
-                                <span class="variant">KÃ­ch cá»¡: <?= e($item['selected_size']) ?></span>
+                                <span class="variant">Kích cỡ: <?= e($item['selected_size']) ?></span>
                             <?php endif; ?>
                             <?php if (($item['selected_color'] ?? '') !== ''): ?>
-                                <span class="variant">MÃ u: <?= e($item['selected_color']) ?></span>
+                                <span class="variant">Màu: <?= e($item['selected_color']) ?></span>
                             <?php endif; ?>
                             <?php if (($item['material'] ?? '') !== ''): ?>
-                                <span class="variant">Cháº¥t liá»‡u: <?= e($item['material']) ?></span>
+                                <span class="variant">Chất liệu: <?= e($item['material']) ?></span>
                             <?php endif; ?>
                         </td>
-                        <td><?= number_format((float)$item['price'], 0, ',', '.') ?>Ä‘</td>
+                        <td><?= number_format((float)$item['price'], 0, ',', '.') ?>đ</td>
                         <td><?= (int)$item['quantity'] ?></td>
-                        <td><?= number_format($subtotal, 0, ',', '.') ?>Ä‘</td>
+                        <td><?= number_format($subtotal, 0, ',', '.') ?>đ</td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
 
-            <p class="total">Tá»•ng tiá»n: <?= number_format((float)$order['total_amount'], 0, ',', '.') ?>Ä‘</p>
+            <p class="total">Tổng tiền: <?= number_format((float)$order['total_amount'], 0, ',', '.') ?>đ</p>
         </section>
     <?php endif; ?>
 
-    <a class="button" href="history.php">â† Quay láº¡i lá»‹ch sá»­</a>
+    <a class="button" href="history.php">← Quay lại lịch sử</a>
 </main>
 </body>
 </html>
