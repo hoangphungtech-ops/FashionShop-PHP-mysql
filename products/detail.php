@@ -512,7 +512,6 @@ $pageTitle = $product !== null ? $productName : 'Không tìm thấy sản phẩm
                         >
                             <?= $isAvailable ? 'Thêm vào giỏ hàng' : 'Sản phẩm hết hàng' ?>
                         </button>
-<<<<<<< HEAD
                     <!-- PRODUCT_VARIANT_FORM_PATCH_BEGIN -->
 <?php
 $variantProductId = (int)($product['id'] ?? ($_GET['id'] ?? 0));
@@ -632,8 +631,6 @@ if ($variantProductId > 0) {
 </div>
 <?php endif; ?>
 <!-- PRODUCT_VARIANT_FORM_PATCH_END -->
-=======
->>>>>>> b0fa476 (merge: Phung, Ngan, Nghi and Hoang edit & cap nhat)
 </form>
 
                     <ul class="product-detail-services" aria-label="Dịch vụ mua hàng">
